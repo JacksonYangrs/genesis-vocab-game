@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4c6ef5">
+<meta name="description" content="创世记 1:1–2 (CEV) 生词互动测试 —— 英译中、中译英、单词拼写、听音辨词、发音训练">
+<title>创世记 1:1–2 · 词汇挑战</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ========== 顶部栏 ========== -->
+  <header class="topbar" id="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">📖</span>
+        <div class="brand-text">
+          <strong>创世记 1:1–2</strong>
+          <small>词汇挑战 · CEV</small>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="btn-progress" title="掌握情况" aria-label="掌握情况">📊</button>
+        <button class="icon-btn" id="btn-wordlist" title="生词表" aria-label="生词表">📚</button>
+      </div>
+    </div>
+    <div class="progress-strip" id="progress-strip" hidden>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <span class="progress-text" id="progress-text"></span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ========== 首页：模式选择 ========== -->
+    <section class="view view-home" id="view-home">
+      <div class="hero">
+        <p class="hero-eyebrow">Genesis 1:1–2 CEV</p>
+        <h1 class="hero-title">Learn · Play · Remember</h1>
+        <p class="hero-verse">「起初，神创造了诸天和大地。大地空荒，毫无生命的形态；是被咆哮的海洋覆盖着的黑暗。但神的灵在水面上运行。」</p>
+        <div class="hero-stats" id="hero-stats"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <h2>选择练习模式</h2>
+          <span class="section-hint">每次随机抽题</span>
+        </div>
+        <div class="mode-grid" id="mode-grid"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <h2>本次设置</h2>
+        </div>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>难度</strong>
+              <small id="diff-desc"></small>
+            </div>
+            <div class="seg" id="seg-difficulty" role="tablist"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>题目数量</strong>
+              <small>从 17 个生词中随机抽取</small>
+            </div>
+            <div class="seg" id="seg-count" role="tablist"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><h2>专项练习</h2></div>
+        <div class="special-grid">
+          <button class="special-card" data-special="wrong">
+            <span class="special-icon">🔁</span>
+            <span class="special-title">错题复习</span>
+            <span class="special-desc" id="wrong-count-desc">还没有错题</span>
+          </button>
+          <button class="special-card" data-special="pronounce">
+            <span class="special-icon">🎤</span>
+            <span class="special-title">发音训练</span>
+            <span class="special-desc">听标准音 · 跟读录音</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 答题页 ========== -->
+    <section class="view view-quiz" id="view-quiz" hidden>
+      <div class="quiz-head">
+        <button class="back-btn" id="btn-quit">✕</button>
+        <div class="quiz-meta">
+          <strong id="quiz-mode-label"></strong>
+          <small id="quiz-diff-label"></small>
+          <div class="quiz-diff-switch" id="quiz-diff-switch">
+            <span class="qds-label">难度</span>
+            <div class="seg qds-seg" id="seg-difficulty-quick"></div>
+          </div>
+        </div>
+        <div class="quiz-score">
+          <span id="quiz-score">0</span>
+          <small>分</small>
+        </div>
+      </div>
+
+      <div class="combo-flag" id="combo-flag" hidden></div>
+
+      <div class="card question-card">
+        <div class="q-kind" id="q-kind"></div>
+
+        <!-- 听音题：先听再答 -->
+        <div class="listen-box" id="listen-box" hidden>
+          <button class="big-speaker" id="btn-speak" aria-label="播放发音">
+            <span class="speaker-icon">🔊</span>
+            <span class="speaker-text">点击播放</span>
+          </button>
+          <button class="replay-btn" id="btn-replay" hidden>🔁 再听一次</button>
+        </div>
+
+        <!-- 选择题题干 -->
+        <div class="q-prompt" id="q-prompt"></div>
+        <div class="q-sub" id="q-sub"></div>
+
+        <!-- 选项 -->
+        <div class="options" id="q-options"></div>
+
+        <!-- 拼写题输入 -->
+        <div class="spell-box" id="spell-box" hidden>
+          <input type="text" id="spell-input" class="spell-input" placeholder="在这里输入英文单词"
+                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <button class="btn-primary btn-submit" id="btn-submit-spell">提交</button>
+        </div>
+
+        <div class="hint-row" id="hint-row" hidden>
+          <button class="hint-btn" id="btn-hint">💡 看提示</button>
+        </div>
+      </div>
+
+      <!-- 反馈面板 -->
+      <div class="feedback" id="feedback" hidden>
+        <div class="feedback-verdict" id="fb-verdict"></div>
+        <div class="feedback-body" id="fb-body"></div>
+        <button class="btn-primary btn-next" id="btn-next">下一题</button>
+      </div>
+    </section>
+
+    <!-- ========== 结果页 ========== -->
+    <section class="view view-result" id="view-result" hidden>
+      <div class="result-hero">
+        <div class="result-ring" id="result-ring">
+          <div class="ring-inner">
+            <span class="ring-pct" id="result-pct">0%</span>
+            <span class="ring-label">正确率</span>
+          </div>
+        </div>
+        <div class="result-summary">
+          <h2 id="result-title">测试完成</h2>
+          <p id="result-sub"></p>
+          <div class="result-chips" id="result-chips"></div>
+        </div>
+      </div>
+
+      <div class="section" id="wrong-section" hidden>
+        <div class="section-head">
+          <h2>📌 答错的单词</h2>
+          <span class="section-hint">已自动加入错题本</span>
+        </div>
+        <div class="wrong-list" id="wrong-list"></div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn-primary btn-wide" id="btn-retry">再来一次</button>
+        <button class="btn-secondary" id="btn-review-wrong">复习这些错题</button>
+        <button class="btn-ghost" id="btn-back-home">返回首页</button>
+      </div>
+    </section>
+
+    <!-- ========== 掌握情况 ========== -->
+    <section class="view view-progress" id="view-progress" hidden>
+      <div class="section-head page-head">
+        <h2>📊 我的掌握情况</h2>
+        <button class="icon-btn" id="btn-close-progress">✕</button>
+      </div>
+
+      <div class="mastery-summary" id="mastery-summary"></div>
+
+      <div class="card">
+        <div class="mastery-list" id="mastery-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><h2>最近测试记录</h2></div>
+        <div class="history-list" id="history-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><h2>进度管理</h2></div>
+        <div class="manage-row">
+          <button class="btn-secondary" id="btn-export">导出进度</button>
+          <button class="btn-secondary" id="btn-import">导入进度</button>
+          <button class="btn-danger" id="btn-reset">清空进度</button>
+        </div>
+        <input type="file" id="file-import" accept="application/json,.json" hidden>
+      </div>
+    </section>
+
+    <!-- ========== 生词表 ========== -->
+    <section class="view view-wordlist" id="view-wordlist" hidden>
+      <div class="section-head page-head">
+        <h2>📚 生词表</h2>
+        <button class="icon-btn" id="btn-close-wordlist">✕</button>
+      </div>
+      <p class="page-note">创世记 1:1–2 (CEV) 全部 17 个重点生词 · 点击喇叭听发音</p>
+      <div class="wordlist" id="wordlist"></div>
+    </section>
+
+    <!-- ========== 发音训练 ========== -->
+    <section class="view view-pronounce" id="view-pronounce" hidden>
+      <div class="section-head page-head">
+        <h2>🎤 发音训练</h2>
+        <button class="icon-btn" id="btn-close-pronounce">✕</button>
+      </div>
+
+      <div class="pron-card" id="pron-card">
+        <div class="pron-word-row">
+          <div class="pron-word-block">
+            <div class="pron-word" id="pron-word">beginning</div>
+            <div class="pron-ipa" id="pron-ipa"></div>
+          </div>
+          <button class="round-speak" id="btn-pron-speak" aria-label="播放标准发音">🔊</button>
+        </div>
+
+        <div class="syllables" id="pron-syllables"></div>
+
+        <div class="pron-meaning" id="pron-meaning"></div>
+        <div class="pron-example" id="pron-example"></div>
+
+        <div class="pron-tips">
+          <div class="pron-tip-row">
+            <button class="btn-soft" id="btn-slow">🐢 慢速</button>
+            <button class="btn-soft" id="btn-syllable">🎵 逐音节</button>
+          </div>
+          <div class="pron-tip-row" id="record-row">
+            <button class="btn-soft btn-record" id="btn-record">🎙️ 开始跟读</button>
+            <button class="btn-soft" id="btn-playback" hidden>▶ 听我的录音</button>
+          </div>
+          <div class="pron-tip-row self-rate-row" id="self-rate-row">
+            <span class="sr-label">跟读自评</span>
+            <button class="btn-soft sr-btn ok" id="btn-rate-ok">✅ 读准了</button>
+            <button class="btn-soft sr-btn" id="btn-rate-again">🔁 还要练</button>
+          </div>
+          <div class="record-hint" id="record-hint"></div>
+        </div>
+
+        <div class="pron-nav">
+          <button class="btn-secondary" id="btn-pron-prev">← 上一个</button>
+          <button class="btn-secondary" id="btn-pron-next">下一个 →</button>
+        </div>
+      </div>
+
+      <div class="pron-index" id="pron-index"></div>
+    </section>
+
+  </main>
+
+  <!-- ========== 提示浮层 ========== -->
+  <div class="toast" id="toast" hidden></div>
+
+  <!-- ========== 确认弹窗 ========== -->
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal">
+      <h3 id="modal-title">确认</h3>
+      <p id="modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="modal-cancel">取消</button>
+        <button class="btn-danger" id="modal-confirm">确定</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
