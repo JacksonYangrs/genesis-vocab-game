@@ -181,19 +181,21 @@ h1, h2, h3, p { margin: 0; }
   border-left: 2px solid rgba(255,255,255,.35);
 }
 .hero-stats {
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
   margin-top: 16px;
-  flex-wrap: wrap;
 }
 .hero-stat {
   background: rgba(255,255,255,.16);
   border-radius: 10px;
-  padding: 7px 11px;
-  font-size: 12px;
+  padding: 7px 6px;
+  font-size: 11px;
+  text-align: center;
   backdrop-filter: blur(4px);
+  white-space: nowrap;
 }
-.hero-stat b { font-size: 15px; margin-right: 3px; font-variant-numeric: tabular-nums; }
+.hero-stat b { display: block; font-size: 15px; margin-bottom: 1px; font-variant-numeric: tabular-nums; }
 
 /* ========== 区块 ========== */
 
@@ -999,6 +1001,9 @@ h1, h2, h3, p { margin: 0; }
   .progress-strip { padding: 0 24px 10px; }
   .hero { padding: 30px 28px; }
   .hero-title { font-size: 30px; }
+  .hero-stats { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .hero-stat { padding: 8px 10px; font-size: 12px; }
+  .hero-stat b { display: inline; font-size: 16px; margin-right: 4px; margin-bottom: 0; }
   .mode-grid { grid-template-columns: repeat(3, 1fr); }
   .special-grid { grid-template-columns: repeat(2, 1fr); }
   .question-card { padding: 30px 28px; }
