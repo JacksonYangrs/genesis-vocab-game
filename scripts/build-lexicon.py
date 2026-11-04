@@ -32,6 +32,11 @@ PROJECT = os.path.dirname(HERE)
 OUT_DIR = os.path.join(PROJECT, "assets", "dict")
 SOURCE = os.environ.get("ECDICT_CSV", "/tmp/ecdict-repo/ecdict.csv")
 
+# 词典体积上限（词条数）。
+# 实测：90,342 词 = 10.2MB，浏览器加载要 35 秒（线上 GitHub Pages）；
+#       25,000 词 = 3.0MB，约 10 秒。上限可用环境变量覆盖。
+MAX_WORDS = int(os.environ.get("LEXICON_MAX_WORDS", "25000"))
+
 
 def pos_short(pos: str) -> str:
     """词性缩写：只取第一个（n. / v. / a. / adv. ...）"""
@@ -57,6 +62,7 @@ def main() -> int:
     os.makedirs(OUT_DIR, exist_ok=True)
 
     kept = {}
+    original_words = set()   # 原始收录的词（区别于后面反推补全的形态变体）
     total = 0
     with open(SOURCE, newline="", encoding="utf-8") as fh:
         reader = csv.reader(fh)
@@ -110,6 +116,7 @@ def main() -> int:
             if not keep:
                 continue
 
+            original_words.add(word)
             kept[word] = {
                 "c": translation,
                 "p": get(row, "phonetic").strip(),
@@ -120,6 +127,22 @@ def main() -> int:
                       .replace("adv/", "").replace("pron/", "").strip()),
                 "f": freq,
             }
+
+    # ---------- 体积裁剪（先裁原始词，再补形态变体） ----------
+    #
+    # 浏览器端加载 10MB 词典实测要 35 秒（线上 GitHub Pages），不可接受。
+    #
+    # 顺序很关键：必须「先按词频裁原始词，再生成形态变体」。
+    # 反过来做会出问题 —— 形态变体词有 3.2 万个，比上限还多，
+    # 会把原始词全部挤掉（实测得到「heaven 在但 heavens 不在」的割裂，
+    # 且原始高频词一个不剩）。
+    #
+    # 裁剪时保留 f=0 的生僻词（排序时排最后但用 MAX_WORDS 兜底全留），
+    # 因为圣经英语里的生僻专有词恰恰是最该查的。
+    if MAX_WORDS and len(kept) > MAX_WORDS:
+        ordered = sorted(kept.items(), key=lambda kv: kv[1]["f"] if kv[1].get("f") else 999999)
+        kept = dict(ordered[:MAX_WORDS])
+        print(f"  体积裁剪: 保留 {len(kept):,} 词（上限 {MAX_WORDS:,}）")
 
     # ---------- 词形变体反向补全 ----------
     # 有些词自身在 ECDICT 里是"孤儿"：没有 collins/oxford/tag/frq，
