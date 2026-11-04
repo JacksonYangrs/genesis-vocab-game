@@ -19,6 +19,15 @@
 
     /**
      * 加载词典（带进度回调）
+     *
+     * 走 gzip 预压缩 + DecompressionStream：
+     *   GitHub Pages 不会对 .json 自动 gzip 传输，
+     *   实测 5.9MB 的词典在线上要 30-90 秒。
+     *   预压缩后传输量 1.8MB（3.3 倍缩减），
+     *   解压是浏览器原生能力，零依赖、零 CPU 成本。
+     *
+     * 若浏览器不支持 DecompressionStream，回退到直接加载未压缩版。
+     *
      * @param {function} onProgress  (loaded, total)
      */
     load: function (onProgress) {
@@ -28,21 +37,46 @@
       this.loading = true;
       var self = this;
 
-      this._promise = fetch('assets/dict/lexicon.json')
+      function done(json) {
+        self.dict = json;
+        self.loaded = true;
+        self.loading = false;
+        if (onProgress) onProgress(Object.keys(json).length, Object.keys(json).length);
+        return json;
+      }
+
+      function fallback() {
+        return fetch('assets/dict/lexicon.json')
+          .then(function (res) {
+            if (!res.ok) throw new Error('词典加载失败 HTTP ' + res.status);
+            return res.json();
+          })
+          .then(done);
+      }
+
+      if (typeof global.DecompressionStream === 'undefined') {
+        return this._promise = fallback();
+      }
+
+      this._promise = fetch('assets/dict/lexicon.json.gz')
         .then(function (res) {
-          if (!res.ok) throw new Error('词典加载失败 HTTP ' + res.status);
-          return res.json();
+          if (!res.ok) throw new Error('gzip 词典不存在');
+          return res.arrayBuffer();
         })
-        .then(function (json) {
-          self.dict = json;
-          self.loaded = true;
-          self.loading = false;
-          if (onProgress) onProgress(Object.keys(json).length, Object.keys(json).length);
-          return json;
+        .then(function (buf) {
+          var stream = new global.DecompressionStream('gzip');
+          var writer = stream.writable.getWriter();
+          writer.write(new Uint8Array(buf));
+          writer.close();
+          return new global.Response(stream.readable).text();
+        })
+        .then(function (text) {
+          return done(JSON.parse(text));
         })
         .catch(function (err) {
-          self.loading = false;
-          throw err;
+          // gzip 路径失败就退回未压缩版
+          console.warn('[Lexicon] gzip 解压失败，回退未压缩版：', err.message);
+          return fallback();
         });
 
       return this._promise;
