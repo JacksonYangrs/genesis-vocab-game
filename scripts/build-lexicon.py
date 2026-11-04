@@ -190,9 +190,36 @@ def main() -> int:
     with open(gz_path, "wb") as fh:
         fh.write(gz)
 
+    # ---------- 生成分片 ----------
+    #
+    # 线上按需加载用：词典按首字母切分，每片 gzip 后平均 58KB。
+    # 一份课程材料通常只涉及 10-20 个首字母 → 实际加载 0.6-1MB，
+    # 而全量 1.9MB 在慢网络下要 30-90 秒。
+    shard_dir = os.path.join(OUT_DIR, "shards")
+    if os.path.isdir(shard_dir):
+        for fn in os.listdir(shard_dir):
+            os.remove(os.path.join(shard_dir, fn))
+    else:
+        os.makedirs(shard_dir, exist_ok=True)
+
+    shards = {}
+    for word, info in kept.items():
+        letter = word[0]
+        shards.setdefault(letter, {})[word] = info
+
+    shard_total_gz = 0
+    for letter, words in sorted(shards.items()):
+        sraw = json.dumps(words, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        sgz = gzip.compress(sraw, 9)
+        with open(os.path.join(shard_dir, f"{letter}.json.gz"), "wb") as fh:
+            fh.write(sgz)
+        shard_total_gz += len(sgz)
+
     print(f"源词条 {total:,} → 精选 {len(kept):,} 词（其中 {added:,} 个由词形变化反推补全）")
-    print(f"  lexicon.json     {len(raw) / 1048576:.2f} MB")
-    print(f"  lexicon.json.gz  {len(gz) / 1048576:.2f} MB")
+    print(f"  lexicon.json        {len(raw) / 1048576:.2f} MB")
+    print(f"  lexicon.json.gz     {len(gz) / 1048576:.2f} MB")
+    print(f"  shards/             {len(shards)} 片，共 {shard_total_gz / 1048576:.2f} MB"
+          f"（平均 {shard_total_gz / max(1, len(shards)) / 1024:.0f} KB/片）")
 
     # 覆盖率自检：本次课程的 17 个目标词必须全部命中
     targets = ["beginning", "god", "heaven", "heavens", "earth", "create", "created",

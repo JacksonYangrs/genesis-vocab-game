@@ -13,54 +13,82 @@
   'use strict';
 
   var Lexicon = {
-    dict: null,        // { word: {c,p,t,e,f} }
+    dict: null,        // 已加载的词条缓存（跨分片累积）
+    _shards: {},       // 已加载的分片
+    _loading: {},      // 正在加载的分片 promise
     loading: false,
     loaded: false,
 
     /**
-     * 加载词典（带进度回调）
+     * 按需加载词典分片
      *
-     * 走 gzip 预压缩 + DecompressionStream：
-     *   GitHub Pages 不会对 .json 自动 gzip 传输，
-     *   实测 5.9MB 的词典在线上要 30-90 秒。
-     *   预压缩后传输量 1.8MB（3.3 倍缩减），
-     *   解压是浏览器原生能力，零依赖、零 CPU 成本。
+     * 词典按首字母分成 26+ 片，每片 gzip 后平均 58KB。
+     * 一份课程材料通常只涉及 10-20 个首字母 → 实际加载 0.6-1MB。
      *
-     * 若浏览器不支持 DecompressionStream，回退到直接加载未压缩版。
+     * 对比全量加载：1.9MB（gzip）在慢网络下要 30-90 秒，不可接受。
      *
-     * @param {function} onProgress  (loaded, total)
+     * @param {Array} words  需要查的词
+     * @param {function} onProgress (loaded, total)
      */
-    load: function (onProgress) {
-      if (this.loaded) return Promise.resolve(this.dict);
-      if (this.loading) return this._promise;
+    loadShards: function (words, onProgress) {
+      var self = this;
+      var letters = {};
+      (words || []).forEach(function (w) {
+        var c = String(w || '').toLowerCase().charAt(0);
+        if (c >= 'a' && c <= 'z') letters[c] = true;
+      });
+      var needed = Object.keys(letters);
+
+      if (!this.dict) this.dict = {};
+      if (!needed.length) {
+        if (onProgress) onProgress(0, 0);
+        return Promise.resolve(this.dict);
+      }
+
+      var done = 0;
+      var jobs = needed.map(function (letter) {
+        if (self._shards[letter]) { done++; return Promise.resolve(); }
+        if (self._loading[letter]) return self._loading[letter];
+
+        self._loading[letter] = self._fetchShard(letter).then(function (words) {
+          self._shards[letter] = true;
+          Object.keys(words).forEach(function (w) { self.dict[w] = words[w]; });
+          done++;
+          if (onProgress) onProgress(done, needed.length);
+        }).catch(function (err) {
+          console.warn('[Lexicon] 分片 ' + letter + ' 加载失败：', err.message);
+          done++;
+          if (onProgress) onProgress(done, needed.length);
+        }).then(function () {
+          delete self._loading[letter];
+        });
+        return self._loading[letter];
+      });
 
       this.loading = true;
-      var self = this;
-
-      function done(json) {
-        self.dict = json;
-        self.loaded = true;
+      return Promise.all(jobs).then(function () {
         self.loading = false;
-        if (onProgress) onProgress(Object.keys(json).length, Object.keys(json).length);
-        return json;
-      }
+        self.loaded = true;
+        return self.dict;
+      });
+    },
 
-      function fallback() {
-        return fetch('assets/dict/lexicon.json')
-          .then(function (res) {
-            if (!res.ok) throw new Error('词典加载失败 HTTP ' + res.status);
-            return res.json();
-          })
-          .then(done);
-      }
+    /** 加载单个分片 */
+    _fetchShard: function (letter) {
+      var gzUrl = 'assets/dict/shards/' + letter + '.json.gz';
 
+      // 不支持 DecompressionStream 时加载未压缩分片
       if (typeof global.DecompressionStream === 'undefined') {
-        return this._promise = fallback();
+        return fetch('assets/dict/shards/' + letter + '.json')
+          .then(function (res) {
+            if (!res.ok) throw new Error('分片不存在 ' + letter);
+            return res.json();
+          });
       }
 
-      this._promise = fetch('assets/dict/lexicon.json.gz')
+      return fetch(gzUrl)
         .then(function (res) {
-          if (!res.ok) throw new Error('gzip 词典不存在');
+          if (!res.ok) throw new Error('分片不存在 ' + letter);
           return res.arrayBuffer();
         })
         .then(function (buf) {
@@ -70,16 +98,7 @@
           writer.close();
           return new global.Response(stream.readable).text();
         })
-        .then(function (text) {
-          return done(JSON.parse(text));
-        })
-        .catch(function (err) {
-          // gzip 路径失败就退回未压缩版
-          console.warn('[Lexicon] gzip 解压失败，回退未压缩版：', err.message);
-          return fallback();
-        });
-
-      return this._promise;
+        .then(function (text) { return JSON.parse(text); });
     },
 
     /** 查词：返回 {word, phonetic, meaning, pos, freq} 或 null */

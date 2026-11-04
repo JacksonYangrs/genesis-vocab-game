@@ -61,8 +61,21 @@
           candidates: candidates,
           pageCount: result.pageCount
         };
-        status('正在加载词典…');
-        return global.Lexicon.load();
+
+        // 按需加载词典分片：只拉候选词涉及的首字母，不加载全量。
+        // 实测全量 1.9MB 在慢网络下要 30-90 秒，分片后通常 0.6-1MB。
+        var words = candidates.map(function (c) { return c.word; });
+        var letters = {};
+        words.forEach(function (w) {
+          var c = String(w).toLowerCase().charAt(0);
+          if (c >= 'a' && c <= 'z') letters[c] = true;
+        });
+        var n = Object.keys(letters).length;
+        status('正在加载词典（' + n + ' 个分片）…');
+
+        return global.Lexicon.loadShards(words, function (done, total) {
+          status('词典加载中 ' + done + '/' + total + '…');
+        });
       }).then(function () {
         status('正在查词并分层…');
         self.buildLayers();
