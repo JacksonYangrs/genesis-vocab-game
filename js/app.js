@@ -8,6 +8,7 @@
   var Store = window.Store;
   var Quiz = window.Quiz;
   var Speech = window.Speech;
+  var Teacher = window.Teacher;
 
   var $ = function (id) { return document.getElementById(id); };
   var els = {};
@@ -62,7 +63,7 @@
 
   /* ============ 视图切换 ============ */
 
-  var VIEWS = ['home', 'quiz', 'result', 'progress', 'wordlist', 'pronounce'];
+  var VIEWS = ['home', 'quiz', 'result', 'progress', 'wordlist', 'pronounce', 'teacher'];
 
   function showView(name) {
     VIEWS.forEach(function (v) {
@@ -75,96 +76,161 @@
 
   /* ============ 首页 ============ */
 
+  /**
+   * 首页渲染：课程列表 + 水平选择 + 题量设置
+   *
+   * 分层原则（松哥定的）：越初级 → 生词表越长；越高级 → 生词表越短。
+   * 所以水平卡片上要直接显示"本层 N 词"，让学生知道选这个水平要背多少。
+   */
   function renderHome() {
-    // 模式卡片
-    var grid = els.modeGrid;
-    grid.innerHTML = '';
-    Object.keys(Quiz.MODES).forEach(function (key) {
-      var m = Quiz.MODES[key];
-      var btn = document.createElement('button');
-      btn.className = 'mode-card';
-      btn.setAttribute('data-mode', key);
-      var tag = '';
-      if (key === 'listen') tag = '练听力';
-      else if (key === 'spell') tag = '练拼写';
-      else if (key === 'mixed') tag = '综合';
-      btn.innerHTML =
-        '<span class="m-icon">' + m.icon + '</span>' +
-        '<span class="m-title">' + m.label + '</span>' +
-        '<span class="m-desc">' + m.desc + '</span>' +
-        (tag ? '<span class="m-tag">' + tag + '</span>' : '');
-      btn.addEventListener('click', function () { startQuiz(key); });
-      grid.appendChild(btn);
-    });
-
-    // 难度切换
-    var diffSeg = els.segDifficulty;
-    diffSeg.innerHTML = '';
-    ['easy', 'medium', 'hard'].forEach(function (k) {
-      var d = Quiz.DIFFICULTY[k];
-      var b = document.createElement('button');
-      b.className = 'seg-btn' + (Store.getSettings().difficulty === k ? ' active' : '');
-      b.textContent = d.label;
-      b.setAttribute('role', 'tab');
-      b.addEventListener('click', function () {
-        Store.setSetting('difficulty', k);
-        renderSettings();
-      });
-      diffSeg.appendChild(b);
-    });
-
-    // 题量切换
-    var countSeg = els.segCount;
-    countSeg.innerHTML = '';
-    [5, 10, 17].forEach(function (n) {
-      var b = document.createElement('button');
-      b.className = 'seg-btn' + (Store.getSettings().count === n ? ' active' : '');
-      b.textContent = n + ' 题';
-      b.setAttribute('role', 'tab');
-      b.addEventListener('click', function () {
-        Store.setSetting('count', n);
-        renderSettings();
-      });
-      countSeg.appendChild(b);
-    });
-
-    renderSettings();
+    renderCourseList();
+    renderLevelGrid();
+    renderCountSeg();
     renderHeroStats();
     renderWrongCount();
   }
 
-  function renderSettings() {
-    var s = Store.getSettings();
-    els.diffDesc.textContent = Quiz.DIFFICULTY[s.difficulty].desc;
-    // 同步高亮
-    Array.prototype.forEach.call(els.segDifficulty.children, function (b, i) {
-      b.classList.toggle('active', ['easy', 'medium', 'hard'][i] === s.difficulty);
+  /** 课程列表 */
+  function renderCourseList() {
+    var box = els.courseList;
+    if (!box) return;
+    box.innerHTML = '';
+
+    var lib = window.Course ? window.Course.library : [];
+    if (!lib.length) {
+      box.innerHTML = '<p class="empty-note">还没有课程。点右上角 🎓 教师模式导入材料生成。</p>';
+      els.courseHint.textContent = '无课程';
+      return;
+    }
+
+    lib.forEach(function (c) {
+      var btn = document.createElement('button');
+      btn.className = 'course-card' + (c.id === window.Course.activeId ? ' active' : '');
+      btn.setAttribute('data-course', c.id);
+      var total = c.levelCounts ? (c.levelCounts[0] + c.levelCounts[1] + c.levelCounts[2]) : c.wordCount;
+      btn.innerHTML =
+        '<span class="c-title">' + esc(c.title) + '</span>' +
+        (c.subtitle ? '<span class="c-sub">' + esc(c.subtitle) + '</span>' : '') +
+        '<span class="c-meta">共 ' + total + ' 词 · 入门 ' +
+        (c.levelCounts ? c.levelCounts[0] : 0) + ' / 进阶 ' +
+        (c.levelCounts ? c.levelCounts[1] : 0) + ' / 挑战 ' +
+        (c.levelCounts ? c.levelCounts[2] : 0) + '</span>';
+      btn.addEventListener('click', function () { selectCourse(c.id); });
+      box.appendChild(btn);
     });
-    Array.prototype.forEach.call(els.segCount.children, function (b, i) {
-      b.classList.toggle('active', [5, 10, 17][i] === s.count);
+
+    els.courseHint.textContent = lib.length + ' 个课程';
+  }
+
+  /** 水平选择卡片 */
+  function renderLevelGrid() {
+    var box = els.levelGrid;
+    if (!box) return;
+    box.innerHTML = '';
+
+    var level = Store.getSettings().level;
+    var cfgMap = window.Fusion ? window.Fusion.LEVEL_CONFIG : {};
+
+    [0, 1, 2].forEach(function (lv) {
+      var cfg = cfgMap[lv] || { label: ['入门', '进阶', '挑战'][lv], desc: '' };
+      var count = currentLevelCount(lv);
+      var btn = document.createElement('button');
+      btn.className = 'level-card' + (lv === level ? ' active' : '');
+      btn.setAttribute('data-level', lv);
+      btn.innerHTML =
+        '<span class="l-top">' +
+          '<span class="l-name">' + esc(cfg.label) + '</span>' +
+          '<span class="l-count">' + count + ' 词</span>' +
+        '</span>' +
+        '<span class="l-desc">' + esc(cfg.desc || '') + '</span>' +
+        '<span class="l-bar"><i style="width:' + levelBarPct(lv, count) + '%"></i></span>';
+      btn.addEventListener('click', function () {
+        Store.setSetting('level', lv);
+        renderLevelGrid();
+        renderCountSeg();
+      });
+      box.appendChild(btn);
+    });
+  }
+
+  /** 当前课程某层的词数 */
+  function currentLevelCount(lv) {
+    var course = window.Course ? window.Course.active() : null;
+    if (!course) return 0;
+    var n = 0;
+    course.words.forEach(function (w) { if (w.level === lv) n++; });
+    return n;
+  }
+
+  /** 水平条形图宽度：相对最长层 */
+  function levelBarPct(lv, count) {
+    var max = 0;
+    [0, 1, 2].forEach(function (l) { max = Math.max(max, currentLevelCount(l)); });
+    if (!max) return 0;
+    return Math.round(count / max * 100);
+  }
+
+  /** 题量切换 */
+  function renderCountSeg() {
+    var seg = els.segCount;
+    if (!seg) return;
+    seg.innerHTML = '';
+    var s = Store.getSettings();
+    var poolSize = currentLevelCount(s.level) || 1;
+
+    [10, 15, 20].forEach(function (n) {
+      var b = document.createElement('button');
+      b.className = 'seg-btn' + (s.count === n ? ' active' : '');
+      b.textContent = n + ' 题';
+      b.setAttribute('role', 'tab');
+      b.addEventListener('click', function () {
+        Store.setSetting('count', n);
+        renderCountSeg();
+      });
+      seg.appendChild(b);
+    });
+
+    els.countDesc.textContent = '本水平共 ' + poolSize + ' 个生词，随机抽取';
+  }
+
+  /** 切换课程 */
+  function selectCourse(id) {
+    var self = this;
+    window.Course.loadCourse(id).then(function () {
+      window.Course.activeId = id;
+      renderHome();
+      toast('已切换到《' + window.Course.activeMeta().title + '》');
+    }).catch(function (err) {
+      toast('课程加载失败：' + err.message);
     });
   }
 
   function renderHeroStats() {
-    var counts = Store.levelCounts(VOCAB);
+    var course = window.Course ? window.Course.active() : null;
+    var words = course ? course.words : VOCAB;
+    if (!words.length) words = VOCAB;
+
+    var counts = Store.levelCounts(words);
     var mastered = counts.mastered + counts.strong;
-    var pct = Math.round(mastered / VOCAB.length * 100);
+    var pct = Math.round(mastered / words.length * 100);
     var totalSeen = 0, totalCorrect = 0;
-    VOCAB.forEach(function (w) {
+    words.forEach(function (w) {
       var r = Store.state.words[w.id];
       if (r) { totalSeen += r.seen; totalCorrect += r.correct; }
     });
     var acc = totalSeen ? Math.round(totalCorrect / totalSeen * 100) : 0;
 
     els.heroStats.innerHTML =
-      '<span class="hero-stat"><b>' + mastered + '/' + VOCAB.length + '</b>已掌握</span>' +
+      '<span class="hero-stat"><b>' + mastered + '/' + words.length + '</b>已掌握</span>' +
       '<span class="hero-stat"><b>' + pct + '%</b>熟练度</span>' +
       '<span class="hero-stat"><b>' + acc + '%</b>总正确率</span>' +
       '<span class="hero-stat"><b>' + totalSeen + '</b>累计答题</span>';
   }
 
   function renderWrongCount() {
-    var wrong = Store.wrongList(VOCAB);
+    var course = window.Course ? window.Course.active() : null;
+    var words = course ? course.words : VOCAB;
+    var wrong = Store.wrongList(words);
     var el = $('wrong-count-desc');
     el.textContent = wrong.length ? ('共 ' + wrong.length + ' 个词待复习') : '还没有错题，继续保持';
     var card = document.querySelector('[data-special="wrong"]');
@@ -173,15 +239,44 @@
 
   /* ============ 答题流程 ============ */
 
-  function startQuiz(mode, opts) {
+  /**
+   * 开始一次融合测试
+   * @param {object} opts {count, level, pool, forceSpell}
+   */
+  function startFusion(opts) {
     opts = opts || {};
     var s = Store.getSettings();
-    Quiz.start(mode, {
+    var course = window.Course ? window.Course.active() : null;
+
+    if (!course) {
+      toast('请先选择或导入一个课程');
+      return;
+    }
+
+    var built = window.Fusion.buildPaper({
+      level: opts.level != null ? opts.level : s.level,
       count: opts.count || s.count,
-      difficulty: opts.difficulty || s.difficulty,
+      course: course,
       pool: opts.pool || null,
       forceSpell: opts.forceSpell || null
     });
+
+    Quiz.current = {
+      mode: 'fusion',
+      modeLabel: '融合测试 · ' + built.config.label,
+      difficulty: built.config,
+      questions: built.questions,
+      index: 0,
+      responses: [],
+      combo: 0,
+      bestCombo: 0,
+      startedAt: Date.now(),
+      finished: false,
+      pool: opts.pool || null,
+      forceSpell: opts.forceSpell || null,
+      courseId: window.Course.activeId
+    };
+
     showView('quiz');
     renderQuestion();
   }
@@ -195,20 +290,16 @@
 
     answered = false;
     els.quizModeLabel.textContent = session.modeLabel;
-    els.quizDiffLabel.textContent = session.difficulty.label + ' · 第 ' + (session.index + 1) + '/' + session.questions.length + ' 题';
-
-    // 同步难度快捷按钮的选中态
-    Array.prototype.forEach.call(els.segDifficultyQuick.children, function (b) {
-      b.classList.toggle('active', b.getAttribute('data-diff') === session.difficulty.key);
-    });
+    els.quizDiffLabel.textContent = '第 ' + (session.index + 1) + '/' + session.questions.length + ' 题 · ' +
+      session.questions.length + ' 题覆盖全部题型';
 
     // 题型标签
-    var kindText = { e2c: '英译中', c2e: '中译英', listen: '听音辨词', spell: '拼写题' };
-    els.qKind.textContent = kindText[q.kind] || '';
+    els.qKind.textContent = window.Fusion.kindLabel(q.kind);
 
     // 题干
     els.qPrompt.textContent = q.prompt;
-    els.qPrompt.className = 'q-prompt' + (q.type === 'choice' && q.kind === 'e2c' ? ' is-word' : '');
+    els.qPrompt.className = 'q-prompt' + (q.kind === 'e2c' ? ' is-word' : '') +
+      (q.kind === 'fill' ? ' is-fill' : '');
     els.qSub.textContent = q.subPrompt || '';
     els.qSub.className = 'q-sub' + (q.kind === 'c2e' ? ' is-pos' : '');
 
@@ -220,9 +311,11 @@
       setTimeout(function () { playQuestionAudio(); }, 260);
     }
 
-    // 选项 / 拼写
+    // 选项 / 拼写 / 排序
     els.spellBox.hidden = q.type !== 'spell';
+    els.orderBox.hidden = q.type !== 'order';
     els.options.innerHTML = '';
+    els.options.hidden = q.type !== 'choice';
     els.spellInput.value = '';
     els.spellInput.disabled = false;
     els.btnSubmitSpell.disabled = false;
@@ -238,6 +331,8 @@
         });
         els.options.appendChild(b);
       });
+    } else if (q.type === 'order') {
+      renderOrderQuestion(q);
     } else {
       els.spellInput.focus();
     }
@@ -245,6 +340,7 @@
     // 提示
     els.hintRow.hidden = false;
     els.btnHint.textContent = '💡 看提示';
+    els.btnHint.disabled = false;
     els.btnHint.onclick = function () {
       els.btnHint.textContent = '💡 ' + q.hintText;
       els.btnHint.disabled = true;
@@ -262,6 +358,54 @@
 
     updateScore();
     updateCombo();
+  }
+
+  /* ============ 句子排序题交互 ============ */
+
+  var orderPicked = [];
+
+  function renderOrderQuestion(q) {
+    orderPicked = [];
+    els.orderSlots.innerHTML = '';
+    els.orderChunks.innerHTML = '';
+
+    q.chunks.forEach(function (chunk, i) {
+      var b = document.createElement('button');
+      b.className = 'chunk-btn';
+      b.textContent = chunk;
+      b.setAttribute('data-i', i);
+      b.addEventListener('click', function () { pickChunk(i); });
+      els.orderChunks.appendChild(b);
+    });
+  }
+
+  function pickChunk(i) {
+    var pickedIdx = orderPicked.indexOf(i);
+    if (pickedIdx >= 0) {
+      // 取消
+      orderPicked.splice(pickedIdx, 1);
+      var btn = els.orderChunks.querySelector('[data-i="' + i + '"]');
+      if (btn) btn.classList.remove('picked');
+    } else {
+      orderPicked.push(i);
+      var btn2 = els.orderChunks.querySelector('[data-i="' + i + '"]');
+      if (btn2) btn2.classList.add('picked');
+    }
+    renderOrderSlots();
+  }
+
+  function renderOrderSlots() {
+    var q = Quiz.question();
+    if (!q || q.type !== 'order') return;
+    els.orderSlots.innerHTML = '';
+    orderPicked.forEach(function (chunkIdx, pos) {
+      var slot = document.createElement('span');
+      slot.className = 'order-slot';
+      slot.textContent = (pos + 1) + '. ' + q.chunks[chunkIdx];
+      slot.addEventListener('click', function () { pickChunk(chunkIdx); });
+      els.orderSlots.appendChild(slot);
+    });
+    els.btnSubmitOrder.disabled = orderPicked.length !== q.chunks.length;
   }
 
   function playQuestionAudio() {
@@ -301,7 +445,16 @@
     answered = true;
 
     var q = Quiz.question();
-    var res = Quiz.submit(response);
+    var res = window.Fusion.grade(q, response);
+
+    // 记录作答
+    Quiz.current.responses.push({ question: q, response: response, grade: res });
+    if (res.correct) {
+      Quiz.current.combo += 1;
+      if (Quiz.current.combo > Quiz.current.bestCombo) Quiz.current.bestCombo = Quiz.current.combo;
+    } else {
+      Quiz.current.combo = 0;
+    }
 
     // 选项态
     if (q.type === 'choice') {
@@ -311,6 +464,12 @@
         if (txt === q.answer) b.classList.add('correct');
         else if (b === chosenBtn) b.classList.add('wrong');
         else b.classList.add('dimmed');
+      });
+    } else if (q.type === 'order') {
+      els.orderChunks.querySelectorAll('.chunk-btn').forEach(function (b) { b.disabled = true; });
+      els.btnSubmitOrder.disabled = true;
+      els.orderSlots.querySelectorAll('.order-slot').forEach(function (s) {
+        s.classList.add(res.correct ? 'correct' : 'wrong');
       });
     } else {
       els.spellInput.disabled = true;
@@ -322,7 +481,7 @@
     }
 
     // 反馈面板
-    var w = wordById(q.wordId);
+    var w = currentWord(q.wordId) || {};
     var fb = els.feedback;
     fb.hidden = false;
     fb.className = 'feedback ' + (res.correct ? 'ok' : 'no');
@@ -340,16 +499,23 @@
     }
 
     // 释义行：英译中的答案本身就是中文，此处改显英文词，避免与上一行重复
-    var meaningText = (q.kind === 'e2c') ? (w.word + '　' + w.pos) : w.meaning;
+    var meaningText = (q.kind === 'e2c') ? (q.word + (w.pos ? '　' + w.pos : '')) : (w.meaning || '');
     var meaningLabel = (q.kind === 'e2c') ? '英文' : '释义';
 
     body += '<div class="fb-line"><span class="fb-label">' + meaningLabel + '</span><span class="fb-text">' + esc(meaningText) + '</span></div>';
-    body += '<div class="fb-line"><span class="fb-label">音标</span><span class="fb-text mono">' + esc(w.phonetic) + '</span></div>';
-    body += '<div class="fb-line"><span class="fb-label">例句</span><span class="fb-text"><i>' + esc(w.example) + '</i><br>' + esc(w.exampleZh) + '</span></div>';
+    if (w.phonetic) {
+      body += '<div class="fb-line"><span class="fb-label">音标</span><span class="fb-text mono">' + esc(w.phonetic) + '</span></div>';
+    }
+    if (w.example) {
+      body += '<div class="fb-line"><span class="fb-label">例句</span><span class="fb-text"><i>' + esc(w.example) + '</i></span></div>';
+    }
+    if (q.sentence) {
+      body += '<div class="fb-line"><span class="fb-label">原句</span><span class="fb-text"><i>' + esc(q.sentence) + '</i></span></div>';
+    }
     if (w.tip) {
       body += '<div class="fb-line"><span class="fb-label">提示</span><span class="fb-text">' + esc(w.tip) + '</span></div>';
     }
-    if (!res.correct && w.note) {
+    if (w.note) {
       body += '<div class="fb-note">💡 ' + esc(w.note) + '</div>';
     }
     if (res.nearMiss) {
@@ -371,6 +537,17 @@
     }, 60);
 
     els.btnNext.focus({ preventScroll: true });
+  }
+
+  /** 从当前课程里取词条 */
+  function currentWord(id) {
+    var course = window.Course ? window.Course.active() : null;
+    if (course) {
+      for (var i = 0; i < course.words.length; i++) {
+        if (course.words[i].id === id) return course.words[i];
+      }
+    }
+    return wordById(id);
   }
 
   function nextQuestion() {
@@ -414,26 +591,28 @@
     if (sum.wrongWords.length) {
       els.wrongSection.hidden = false;
       els.wrongList.innerHTML = sum.wrongWords.map(function (r) {
-        var w = wordById(r.question.wordId);
-        state.lastWrongIds.push(w.id);
+        var w = currentWord(r.question.wordId) || {};
         var userTxt = r.response;
         var q = r.question;
         var yours;
         if (q.type === 'spell') {
           yours = '你写的：<b>' + esc(userTxt || '(空)') + '</b>';
+        } else if (q.type === 'order') {
+          yours = '你的顺序：<b>' + esc(Array.isArray(userTxt) ? userTxt.join(' / ') : (userTxt || '')) + '</b>';
         } else {
           yours = '你选的：<b>' + esc(userTxt) + '</b>';
         }
         var noteHtml = w.note ? '<div class="wrong-note">💡 ' + esc(w.note) + '</div>' : '';
+        var exampleHtml = w.example ? '<div class="wrong-cn">例句：' + esc(w.example) + '</div>' : '';
         return '<div class="wrong-item">' +
           '<div class="wrong-head">' +
-            '<span class="wrong-word">' + esc(w.word) + '</span>' +
-            '<span class="wrong-ipa">' + esc(w.phonetic) + '</span>' +
+            '<span class="wrong-word">' + esc(w.word || q.word) + '</span>' +
+            '<span class="wrong-ipa">' + esc(w.phonetic || '') + '</span>' +
           '</div>' +
           '<div class="wrong-yours">' + yours + '</div>' +
-          '<div class="wrong-right">正确答案：<b>' + esc(w.word) + '</b> ' + esc(w.phonetic) + '</div>' +
-          '<div class="wrong-cn">中文释义：' + esc(w.meaning) + '</div>' +
-          '<div class="wrong-cn">例句：' + esc(w.example) + '</div>' +
+          '<div class="wrong-right">正确答案：<b>' + esc(q.answerDetail) + '</b></div>' +
+          '<div class="wrong-cn">中文释义：' + esc(w.meaning || '') + '</div>' +
+          exampleHtml +
           noteHtml +
         '</div>';
       }).join('');
@@ -447,8 +626,16 @@
 
   /* ============ 掌握情况 ============ */
 
+  /** 当前课程的词表（没有课程时退回内置的 17 词） */
+  function currentWords() {
+    var course = window.Course ? window.Course.active() : null;
+    if (course && course.words.length) return course.words;
+    return VOCAB;
+  }
+
   function renderProgress() {
-    var counts = Store.levelCounts(VOCAB);
+    var words = currentWords();
+    var counts = Store.levelCounts(words);
     var order = Store.LEVEL_ORDER;
     var labels = { new: '未练习', weak: '生疏', learning: '巩固中', strong: '熟悉', mastered: '已掌握' };
     var colors = { new: '#94a3b8', weak: '#e5484d', learning: '#f5a524', strong: '#3b82f6', mastered: '#12a594' };
@@ -461,7 +648,7 @@
     }).join('');
 
     // 按掌握程度排序：最弱的排前面
-    var sorted = VOCAB.slice().sort(function (a, b) {
+    var sorted = words.slice().sort(function (a, b) {
       var la = Store.levelOf(a.id), lb = Store.levelOf(b.id);
       var d = order.indexOf(la) - order.indexOf(lb);
       if (d !== 0) return d;
@@ -479,8 +666,8 @@
       var pron = r && r.pronTotal ? ('🎤 跟读 ' + r.pronOk + '/' + r.pronTotal) : '';
       return '<div class="m-row">' +
         '<span class="m-dot" style="background:' + meta.color + '"></span>' +
-        '<div class="m-word"><b>' + esc(w.word) + ' <span style="color:var(--text-3);font-weight:400;font-size:12px">' + esc(w.phonetic) + '</span></b>' +
-          '<small>' + esc(w.meaning) + (pron ? ' · ' + pron : '') + '</small></div>' +
+        '<div class="m-word"><b>' + esc(w.word) + ' <span style="color:var(--text-3);font-weight:400;font-size:12px">' + esc(w.phonetic || '') + '</span></b>' +
+          '<small>' + esc(w.meaning || '') + (pron ? ' · ' + pron : '') + '</small></div>' +
         '<div class="m-stats">' +
           '<span class="m-badge" style="background:' + meta.color + '1a;color:' + meta.color + '">' + meta.label + '</span>' +
           '<span class="m-acc">' + stats + '</span>' +
@@ -510,20 +697,28 @@
   /* ============ 生词表 ============ */
 
   function renderWordlist() {
-    els.wordlist.innerHTML = VOCAB.map(function (w, i) {
+    var words = currentWords();
+    els.wordlistNote.textContent = (window.Course && window.Course.activeMeta()
+      ? window.Course.activeMeta().title + ' · 共 ' + words.length + ' 个生词'
+      : '共 ' + words.length + ' 个生词') + ' · 点击喇叭听发音';
+
+    els.wordlist.innerHTML = words.map(function (w, i) {
       var lvl = Store.levelOf(w.id);
       var meta = Store.LEVELS[lvl];
+      var lvlTag = (w.level != null)
+        ? '<span class="wl-tier">T' + (w.level + 1) + '</span>' : '';
       return '<div class="wl-item">' +
         '<span class="wl-num">' + (i + 1) + '</span>' +
         '<div class="wl-body">' +
           '<div class="wl-top">' +
             '<span class="wl-word">' + esc(w.word) + '</span>' +
-            '<span class="wl-ipa">' + esc(w.phonetic) + '</span>' +
-            '<span class="wl-pos">' + esc(w.pos) + '</span>' +
+            '<span class="wl-ipa">' + esc(w.phonetic || '') + '</span>' +
+            '<span class="wl-pos">' + esc(w.pos || '') + '</span>' +
+            lvlTag +
             '<span class="m-badge" style="background:' + meta.color + '1a;color:' + meta.color + '">' + meta.label + '</span>' +
           '</div>' +
-          '<div class="wl-cn">' + esc(w.meaning) + '</div>' +
-          '<div class="wl-ex"><i>' + esc(w.example) + '</i><br>' + esc(w.exampleZh) + '</div>' +
+          '<div class="wl-cn">' + esc(w.meaning || '') + '</div>' +
+          (w.example ? '<div class="wl-ex"><i>' + esc(w.example) + '</i></div>' : '') +
         '</div>' +
         '<button class="wl-speak" data-word="' + esc(w.word) + '" aria-label="播放 ' + esc(w.word) + '">🔊</button>' +
       '</div>';
@@ -539,20 +734,23 @@
   /* ============ 发音训练 ============ */
 
   function renderPronounce() {
-    var w = VOCAB[state.pronIndex];
+    var words = currentWords();
+    if (state.pronIndex >= words.length) state.pronIndex = 0;
+    var w = words[state.pronIndex];
     els.pronWord.textContent = w.word;
-    els.pronIpa.textContent = w.phonetic;
-    els.pronMeaning.textContent = w.meaning + '　(' + w.pos + ')';
+    els.pronIpa.textContent = w.phonetic || '';
+    els.pronMeaning.textContent = (w.meaning || '') + (w.pos ? '　(' + w.pos + ')' : '');
     els.pronExample.innerHTML =
-      '<div class="pe-en">' + esc(w.example) + '</div>' +
-      '<div class="pe-zh">' + esc(w.exampleZh) + '</div>';
+      '<div class="pe-en">' + esc(w.example || '') + '</div>' +
+      (w.exampleZh ? '<div class="pe-zh">' + esc(w.exampleZh) + '</div>' : '');
 
-    els.pronSyllables.innerHTML = w.syllables.map(function (s, i) {
+    var syls = w.syllables || (w.word ? window.Teacher.splitSyllables(w.word) : []);
+    els.pronSyllables.innerHTML = syls.map(function (s, i) {
       return '<span class="syl" data-i="' + i + '">' + esc(s) + '</span>';
     }).join('');
 
     // 索引条
-    els.pronIndex.innerHTML = VOCAB.map(function (x, i) {
+    els.pronIndex.innerHTML = words.map(function (x, i) {
       var lvl = Store.levelOf(x.id);
       var meta = Store.LEVELS[lvl];
       return '<button class="pi-item' + (i === state.pronIndex ? ' active' : '') + '" data-i="' + i + '" ' +
@@ -580,7 +778,8 @@
   }
 
   function playStandard(rate) {
-    var w = VOCAB[state.pronIndex];
+    var w = currentWords()[state.pronIndex];
+    if (!w) return;
     els.btnPronSpeak.classList.add('speaking');
     Speech.speak(w.word, { rate: rate || 0.92 }).then(function () {
       els.btnPronSpeak.classList.remove('speaking');
@@ -588,8 +787,10 @@
   }
 
   function playSyllables() {
-    var w = VOCAB[state.pronIndex];
-    var items = w.syllables.map(function (s, i) {
+    var w = currentWords()[state.pronIndex];
+    if (!w) return;
+    var syls = w.syllables || (window.Teacher ? window.Teacher.splitSyllables(w.word) : [w.word]);
+    var items = syls.map(function (s, i) {
       return { text: s, __index: i };
     });
     var sylEls = els.pronSyllables.children;
@@ -642,7 +843,9 @@
 
   /** 跟读自评：结果计入该词的跟读统计 */
   function ratePronounce(ok) {
-    var w = VOCAB[state.pronIndex];
+    var words = currentWords();
+    var w = words[state.pronIndex];
+    if (!w) return;
     Store.recordPronounce(w.id, ok);
     els.btnRateOk.classList.toggle('rated', ok);
     els.recordHint.textContent = ok
@@ -651,19 +854,205 @@
     toast(ok ? '已记录 · 读准了' : '已记录 · 还要练');
   }
 
+  /* ============ 教师模式 ============ */
+
+  function renderTeacher() {
+    els.teacherStep1.hidden = Teacher.step !== 1;
+    els.teacherStep2.hidden = Teacher.step !== 2;
+    els.teacherStep3.hidden = Teacher.step !== 3;
+
+    if (Teacher.step === 2) renderTeacherWords();
+    if (Teacher.step === 3) renderExportBox();
+  }
+
+  /** 步骤 2：三层词表预览 + 校对 */
+  function renderTeacherWords() {
+    var byLevel = Teacher.selectedByLevel();
+    var total = byLevel[0].length + byLevel[1].length + byLevel[2].length;
+    var th = window.Lexicon.lastThresholds || {};
+
+    els.teacherSummary.textContent =
+      '共 ' + total + ' 个生词（入门 ' + byLevel[0].length +
+      ' / 进阶 ' + byLevel[1].length + ' / 挑战 ' + byLevel[2].length +
+      '）· 难度门槛 ' + (th.t1 || '-') + ' / ' + (th.t2 || '-') +
+      '。点词名可切换分层，点「×」移除该词。';
+
+    var names = ['入门', '进阶', '挑战'];
+    els.teacherLevels.innerHTML = byLevel.map(function (list, i) {
+      return '<div class="tl-row">' +
+        '<span class="tl-name t' + i + '">' + names[i] + '</span>' +
+        '<span class="tl-count">' + list.length + ' 词</span>' +
+        '<span class="tl-bar"><i class="t' + i + '" style="width:' +
+          (total ? Math.round(list.length / total * 100) : 0) + '%"></i></span>' +
+      '</div>';
+    }).join('');
+
+    var all = [];
+    Teacher.layers.forEach(function (list) { list.forEach(function (it) { all.push(it); }); });
+    all.sort(function (a, b) { return a.score - b.score; });
+
+    els.teacherWordlist.innerHTML = all.map(function (it) {
+      var on = Teacher._selected[it.word];
+      return '<div class="tw-item' + (on ? '' : ' off') + '">' +
+        '<button class="tw-check" data-act="toggle" data-w="' + esc(it.word) + '">' +
+          (on ? '✓' : '＋') + '</button>' +
+        '<div class="tw-main">' +
+          '<div class="tw-top">' +
+            '<span class="tw-word">' + esc(it.word) + '</span>' +
+            '<span class="tw-ipa">' + esc(it.info.phonetic || '') + '</span>' +
+            '<span class="tw-score">难度 ' + it.score + '</span>' +
+          '</div>' +
+          '<div class="tw-cn">' + esc(it.info.meaning) + '</div>' +
+          (it.sentences && it.sentences[0]
+            ? '<div class="tw-ex"><i>' + esc(it.sentences[0]) + '</i></div>' : '') +
+        '</div>' +
+        '<div class="tw-actions">' +
+          [0, 1, 2].map(function (lv) {
+            return '<button class="tw-lv t' + lv + (it.level === lv ? ' on' : '') +
+              '" data-act="level" data-w="' + esc(it.word) + '" data-lv="' + lv + '">' +
+              ['入', '进', '挑'][lv] + '</button>';
+          }).join('') +
+          '<button class="tw-del" data-act="del" data-w="' + esc(it.word) + '">×</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  /** 步骤 3：导出信息 */
+  function renderExportBox() {
+    var d = Teacher.packageData;
+    if (!d) return;
+    var size = new Blob([JSON.stringify(d)]).size;
+    els.exportBox.innerHTML =
+      '<div class="ex-row"><span>课程标题</span><b>' + esc(d.title) + '</b></div>' +
+      '<div class="ex-row"><span>生词数</span><b>' + d.words.length + ' 个</b></div>' +
+      '<div class="ex-row"><span>句子数</span><b>' + d.sentences.length + ' 条</b></div>' +
+      '<div class="ex-row"><span>文件大小</span><b>' + (size / 1024).toFixed(1) + ' KB</b></div>' +
+      '<div class="ex-row"><span>文件名</span><b class="mono">' + esc(d.id) + '.json</b></div>';
+  }
+
+  /** 教师模式事件绑定 */
+  function bindTeacher() {
+    // 拖拽上传
+    var dz = els.dropZone;
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e) {
+        e.preventDefault();
+        dz.classList.add('drag');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      dz.addEventListener(ev, function (e) {
+        e.preventDefault();
+        dz.classList.remove('drag');
+      });
+    });
+    dz.addEventListener('drop', function (e) {
+      var f = e.dataTransfer.files[0];
+      if (f) handleParse(f, null);
+    });
+    dz.addEventListener('click', function () { els.filePdf.click(); });
+    els.filePdf.addEventListener('change', function () {
+      var f = els.filePdf.files[0];
+      if (f) handleParse(f, null);
+    });
+
+    // 解析
+    els.btnParse.addEventListener('click', function () {
+      handleParse(null, els.teacherText.value);
+    });
+
+    // 词表校对
+    els.teacherWordlist.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      var act = btn.getAttribute('data-act');
+      var w = btn.getAttribute('data-w');
+      if (act === 'toggle') {
+        Teacher.toggleWord(w);
+      } else if (act === 'del') {
+        Teacher._selected[w] = false;
+      } else if (act === 'level') {
+        Teacher.setLevel(w, parseInt(btn.getAttribute('data-lv'), 10));
+      }
+      renderTeacherWords();
+    });
+
+    els.btnTeacherBack.addEventListener('click', function () {
+      Teacher.step = 1;
+      renderTeacher();
+    });
+
+    // 导出
+    els.btnTeacherExport.addEventListener('click', function () {
+      var meta = {
+        title: els.teacherText.value ? els.teacherText.value.split('\n')[0].slice(0, 40) : '新课程',
+        subtitle: '教师导入 · ' + new Date().toLocaleDateString('zh-CN')
+      };
+      var data = Teacher.buildPackage(meta);
+      Teacher.step = 3;
+      renderTeacher();
+      toast('课程包已生成');
+    });
+
+    els.btnTeacherDownload.addEventListener('click', function () {
+      Teacher.download();
+      toast('已下载课程包');
+    });
+
+    els.btnTeacherCopy.addEventListener('click', function () {
+      Teacher.copy().then(function () {
+        toast('已复制到剪贴板');
+      }).catch(function (err) {
+        toast('复制失败：' + err.message);
+      });
+    });
+
+    els.btnTeacherPreview.addEventListener('click', function () {
+      var data = Teacher.packageData;
+      if (!data) return;
+      window.Course.saveLocal(data);
+      window.Course.activeId = data.id;
+      showView('home');
+      renderHome();
+      toast('已切换到新课程，去首页开始测试吧');
+    });
+  }
+
+  /** 执行解析 */
+  function handleParse(file, text) {
+    els.teacherStatus.textContent = '正在解析…';
+    els.teacherStatus.className = 'teacher-status busy';
+    els.btnParse.disabled = true;
+
+    Teacher.parse(file, text, function (msg) {
+      els.teacherStatus.textContent = msg;
+    }).then(function () {
+      els.teacherStatus.textContent = '';
+      els.teacherStatus.className = 'teacher-status';
+      els.btnParse.disabled = false;
+      Teacher.step = 2;
+      renderTeacher();
+      toast('已提取生词，请校对');
+    }).catch(function (err) {
+      els.teacherStatus.textContent = '❌ ' + err.message;
+      els.teacherStatus.className = 'teacher-status error';
+      els.btnParse.disabled = false;
+    });
+  }
+
   /* ============ 事件绑定 ============ */
 
   function bind() {
-    // 首页
-    els.modeGrid.addEventListener('click', function (e) {
-      var card = e.target.closest('.mode-card');
-      if (card) startQuiz(card.getAttribute('data-mode'));
+    // 首页：开始测试
+    els.btnStart.addEventListener('click', function () {
+      startFusion();
     });
 
     document.querySelector('[data-special="wrong"]').addEventListener('click', function () {
-      var wrong = Store.wrongList(VOCAB);
+      var wrong = Store.wrongList(currentWords());
       if (!wrong.length) { toast('还没有错题，先做一次测试吧'); return; }
-      startQuiz('mixed', {
+      startFusion({
         pool: wrong,
         count: Math.min(wrong.length, Store.getSettings().count)
       });
@@ -673,32 +1062,6 @@
       state.pronIndex = 0;
       renderPronounce();
       showView('pronounce');
-    });
-
-    // 答题页难度快捷切换：立即用新难度重开当前模式
-    els.segDifficultyQuick.innerHTML = '';
-    ['easy', 'medium', 'hard'].forEach(function (k) {
-      var b = document.createElement('button');
-      b.className = 'seg-btn';
-      b.textContent = Quiz.DIFFICULTY[k].label;
-      b.setAttribute('data-diff', k);
-      b.addEventListener('click', function () {
-        if (Quiz.current && Quiz.current.difficulty.key === k) return;
-        Store.setSetting('difficulty', k);
-        var s = Quiz.current;
-        if (s) {
-          Quiz.start(s.mode, {
-            count: s.questions.length,
-            difficulty: k,
-            pool: s.pool,
-            forceSpell: s.forceSpell
-          });
-        }
-        renderHome();
-        renderQuestion();
-        toast('已切换为「' + Quiz.DIFFICULTY[k].label + '」难度');
-      });
-      els.segDifficultyQuick.appendChild(b);
     });
 
     // 答题
@@ -723,6 +1086,16 @@
     els.spellInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); els.btnSubmitSpell.click(); }
     });
+    els.btnSubmitOrder.addEventListener('click', function () {
+      if (answered) return;
+      var q = Quiz.question();
+      if (!q || q.type !== 'order') return;
+      if (orderPicked.length !== q.chunks.length) {
+        toast('请把所有片段都排好');
+        return;
+      }
+      submitAnswer(orderPicked.map(function (i) { return q.chunks[i]; }), null);
+    });
     els.btnNext.addEventListener('click', nextQuestion);
 
     // 键盘快捷键（桌面）
@@ -746,16 +1119,21 @@
 
     // 结果页
     els.btnRetry.addEventListener('click', function () {
-      Quiz.restart();
-      showView('quiz');
-      renderQuestion();
+      var s = Quiz.current;
+      if (!s) { showView('home'); renderHome(); return; }
+      startFusion({
+        count: s.questions.length,
+        level: s.difficulty.level,
+        pool: s.pool,
+        forceSpell: s.forceSpell
+      });
     });
     els.btnReviewWrong.addEventListener('click', function () {
       if (!state.lastWrongIds.length) { toast('没有错题可复习'); return; }
       var ids = {};
       state.lastWrongIds.forEach(function (id) { ids[id] = true; });
-      var pool = VOCAB.filter(function (w) { return ids[w.id]; });
-      startQuiz('mixed', { pool: pool, count: pool.length, forceSpell: ids });
+      var pool = currentWords().filter(function (w) { return ids[w.id]; });
+      startFusion({ pool: pool, count: pool.length, forceSpell: ids });
     });
     els.btnBackHome.addEventListener('click', function () {
       showView('home'); renderHome();
@@ -835,13 +1213,25 @@
     els.btnRateOk.addEventListener('click', function () { ratePronounce(true); });
     els.btnRateAgain.addEventListener('click', function () { ratePronounce(false); });
     els.btnPronPrev.addEventListener('click', function () {
-      state.pronIndex = (state.pronIndex - 1 + VOCAB.length) % VOCAB.length;
+      var words = currentWords();
+      state.pronIndex = (state.pronIndex - 1 + words.length) % words.length;
       renderPronounce();
     });
     els.btnPronNext.addEventListener('click', function () {
-      state.pronIndex = (state.pronIndex + 1) % VOCAB.length;
+      var words = currentWords();
+      state.pronIndex = (state.pronIndex + 1) % words.length;
       renderPronounce();
     });
+
+    // 教师模式
+    els.btnTeacher.addEventListener('click', function () {
+      showView('teacher');
+      renderTeacher();
+    });
+    els.btnCloseTeacher.addEventListener('click', function () {
+      showView('home'); renderHome();
+    });
+    bindTeacher();
   }
 
   /* ============ 启动 ============ */
@@ -855,10 +1245,36 @@
       modalText: $('modal-text'),
       modalConfirm: $('modal-confirm'),
       modalCancel: $('modal-cancel'),
-      modeGrid: $('mode-grid'),
-      segDifficulty: $('seg-difficulty'),
+      courseList: $('course-list'),
+      courseHint: $('course-hint'),
+      levelGrid: $('level-grid'),
       segCount: $('seg-count'),
-      diffDesc: $('diff-desc'),
+      countDesc: $('count-desc'),
+      btnStart: $('btn-start'),
+      wordlistNote: $('wordlist-note'),
+      orderBox: $('order-box'),
+      orderSlots: $('order-slots'),
+      orderChunks: $('order-chunks'),
+      btnSubmitOrder: $('btn-submit-order'),
+      btnTeacher: $('btn-teacher'),
+      btnCloseTeacher: $('btn-close-teacher'),
+      teacherStep1: $('teacher-step-1'),
+      teacherStep2: $('teacher-step-2'),
+      teacherStep3: $('teacher-step-3'),
+      dropZone: $('drop-zone'),
+      filePdf: $('file-pdf'),
+      teacherText: $('teacher-text'),
+      btnParse: $('btn-parse'),
+      teacherStatus: $('teacher-status'),
+      teacherSummary: $('teacher-summary'),
+      teacherLevels: $('teacher-levels'),
+      teacherWordlist: $('teacher-wordlist'),
+      btnTeacherBack: $('btn-teacher-back'),
+      btnTeacherExport: $('btn-teacher-export'),
+      btnTeacherDownload: $('btn-teacher-download'),
+      btnTeacherCopy: $('btn-teacher-copy'),
+      btnTeacherPreview: $('btn-teacher-preview'),
+      exportBox: $('export-box'),
       heroStats: $('hero-stats'),
       progressStrip: $('progress-strip'),
       progressFill: $('progress-fill'),
@@ -931,8 +1347,48 @@
     Store.load();
     Speech.init();
     bind();
-    renderHome();
     showView('home');
+
+    // 加载课程库（异步，首屏先用内置 17 词兜底）
+    // 兜底课程按人工分好的难度分层，保证「入门词数 > 进阶 > 挑战」成立
+    var TIERS = [
+      ['god', 'form', 'life', 'move', 'earth', 'water', 'create', 'spirit'],
+      ['barren', 'moving', 'ocean', 'darkness', 'heaven'],
+      ['beginning', 'created', 'roaring', 'heavens']
+    ];
+    var tierOf = {};
+    TIERS.forEach(function (list, lv) {
+      list.forEach(function (w) { tierOf[w] = lv; });
+    });
+
+    var fallbackCourse = {
+      id: 'genesis-1-1-2',
+      title: '创世记 1:1–2',
+      subtitle: 'CEV · Genesis 1:1-2',
+      reference: 'Genesis 1:1-2 (CEV)',
+      quote: '「起初，神创造了诸天和大地。大地空荒，毫无生命的形态；是被咆哮的海洋覆盖着的黑暗。但神的灵在水面上运行。」',
+      words: VOCAB.map(function (w) {
+        return {
+          id: w.id, word: w.word, phonetic: w.phonetic, meaning: w.meaning,
+          pos: w.pos, level: tierOf[w.word] != null ? tierOf[w.word] : 0, score: 0,
+          distractors: w.enDistractors || [], cnDistractors: w.cnDistractors || [],
+          example: w.example, exampleZh: w.exampleZh, tip: w.tip, note: w.note,
+          syllables: w.syllables || []
+        };
+      }),
+      sentences: []
+    };
+    window.Course.saveLocal(fallbackCourse);
+
+    window.Course.loadLibrary().then(function () {
+      renderHome();
+    }).catch(function () {
+      // 没有 courses/index.json 时用内置课程，不报错
+      els.courseHint.textContent = '内置课程';
+      renderHome();
+    });
+
+    renderHome();
   }
 
   if (document.readyState === 'loading') {

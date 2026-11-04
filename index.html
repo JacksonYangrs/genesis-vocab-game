@@ -26,6 +26,7 @@
       <div class="topbar-actions">
         <button class="icon-btn" id="btn-progress" title="掌握情况" aria-label="掌握情况">📊</button>
         <button class="icon-btn" id="btn-wordlist" title="生词表" aria-label="生词表">📚</button>
+        <button class="icon-btn" id="btn-teacher" title="教师模式" aria-label="教师模式">🎓</button>
       </div>
     </div>
     <div class="progress-strip" id="progress-strip" hidden>
@@ -36,21 +37,30 @@
 
   <main class="main">
 
-    <!-- ========== 首页：模式选择 ========== -->
+    <!-- ========== 首页：课程 → 水平 → 开始 ========== -->
     <section class="view view-home" id="view-home">
       <div class="hero">
-        <p class="hero-eyebrow">Genesis 1:1–2 CEV</p>
+        <div class="hero-rule" aria-hidden="true"><span>✦</span></div>
+        <p class="hero-eyebrow" id="hero-eyebrow">Genesis 1:1–2 CEV</p>
         <h1 class="hero-title">Learn · Play · Remember</h1>
-        <p class="hero-verse">「起初，神创造了诸天和大地。大地空荒，毫无生命的形态；是被咆哮的海洋覆盖着的黑暗。但神的灵在水面上运行。」</p>
+        <p class="hero-verse" id="hero-verse">「起初，神创造了诸天和大地。大地空荒，毫无生命的形态；是被咆哮的海洋覆盖着的黑暗。但神的灵在水面上运行。」</p>
         <div class="hero-stats" id="hero-stats"></div>
       </div>
 
       <div class="section">
         <div class="section-head">
-          <h2>选择练习模式</h2>
-          <span class="section-hint">每次随机抽题</span>
+          <h2>选择课程</h2>
+          <span class="section-hint" id="course-hint">正在加载…</span>
         </div>
-        <div class="mode-grid" id="mode-grid"></div>
+        <div class="course-list" id="course-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <h2>选择你的水平</h2>
+          <span class="section-hint">生词表长度随水平变化</span>
+        </div>
+        <div class="level-grid" id="level-grid"></div>
       </div>
 
       <div class="section">
@@ -60,19 +70,13 @@
         <div class="settings-card">
           <div class="setting-row">
             <div class="setting-label">
-              <strong>难度</strong>
-              <small id="diff-desc"></small>
-            </div>
-            <div class="seg" id="seg-difficulty" role="tablist"></div>
-          </div>
-          <div class="setting-row">
-            <div class="setting-label">
               <strong>题目数量</strong>
-              <small>从 17 个生词中随机抽取</small>
+              <small id="count-desc"></small>
             </div>
             <div class="seg" id="seg-count" role="tablist"></div>
           </div>
         </div>
+        <button class="btn-primary btn-start" id="btn-start">开始测试 →</button>
       </div>
 
       <div class="section">
@@ -130,6 +134,13 @@
 
         <!-- 选项 -->
         <div class="options" id="q-options"></div>
+
+        <!-- 句子排序：片段按钮 -->
+        <div class="order-box" id="order-box" hidden>
+          <div class="order-slots" id="order-slots"></div>
+          <div class="order-chunks" id="order-chunks"></div>
+          <button class="btn-primary btn-submit" id="btn-submit-order">提交排序</button>
+        </div>
 
         <!-- 拼写题输入 -->
         <div class="spell-box" id="spell-box" hidden>
@@ -268,6 +279,58 @@
       <div class="pron-index" id="pron-index"></div>
     </section>
 
+    <!-- ========== 教师模式 ========== -->
+    <section class="view view-teacher" id="view-teacher" hidden>
+      <div class="section-head page-head">
+        <h2>🎓 教师模式</h2>
+        <button class="icon-btn" id="btn-close-teacher">✕</button>
+      </div>
+      <p class="page-note">导入课程材料（PDF 或粘贴文本），系统自动提取生词、查词典、按难度分层，生成词表与测试。</p>
+
+      <!-- 步骤 1：导入 -->
+      <div class="teacher-step" id="teacher-step-1">
+        <div class="step-head"><span class="step-num">1</span><h3>导入课程材料</h3></div>
+        <div class="drop-zone" id="drop-zone">
+          <div class="dz-icon">📄</div>
+          <p class="dz-title">把 PDF 拖到这里</p>
+          <p class="dz-sub">或点击选择文件</p>
+          <input type="file" id="file-pdf" accept="application/pdf,.pdf" hidden>
+        </div>
+        <div class="or-divider"><span>或者</span></div>
+        <textarea id="teacher-text" class="teacher-textarea"
+                  placeholder="也可以直接粘贴课文内容，例如：&#10;In the beginning God created the heavens and the earth. The earth was barren..."></textarea>
+        <button class="btn-primary btn-wide" id="btn-parse">解析材料 →</button>
+        <div class="teacher-status" id="teacher-status"></div>
+      </div>
+
+      <!-- 步骤 2：校对词表 -->
+      <div class="teacher-step" id="teacher-step-2" hidden>
+        <div class="step-head"><span class="step-num">2</span><h3>校对生词表</h3></div>
+        <p class="step-note" id="teacher-summary"></p>
+
+        <div class="teacher-levels" id="teacher-levels"></div>
+
+        <div class="teacher-wordlist" id="teacher-wordlist"></div>
+
+        <div class="teacher-actions">
+          <button class="btn-secondary" id="btn-teacher-back">← 返回修改</button>
+          <button class="btn-primary" id="btn-teacher-export">导出课程包</button>
+        </div>
+      </div>
+
+      <!-- 步骤 3：导出结果 -->
+      <div class="teacher-step" id="teacher-step-3" hidden>
+        <div class="step-head"><span class="step-num">3</span><h3>课程包已生成</h3></div>
+        <div class="export-box" id="export-box"></div>
+        <div class="teacher-actions">
+          <button class="btn-secondary" id="btn-teacher-download">⬇️ 下载 JSON</button>
+          <button class="btn-secondary" id="btn-teacher-copy">📋 复制到剪贴板</button>
+          <button class="btn-primary" id="btn-teacher-preview">在学生端预览</button>
+        </div>
+        <p class="step-note">把下载的 JSON 放到仓库 <code>courses/</code> 目录，并在 <code>courses/index.json</code> 里加一行清单即可发布。</p>
+      </div>
+    </section>
+
   </main>
 
   <!-- ========== 提示浮层 ========== -->
@@ -291,6 +354,11 @@
 <script src="js/store.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/lexicon.js"></script>
+<script src="js/importer.js"></script>
+<script src="js/course.js"></script>
+<script src="js/fusion.js"></script>
+<script src="js/teacher.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

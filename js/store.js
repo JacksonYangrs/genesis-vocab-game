@@ -26,7 +26,7 @@
       version: 1,
       words: {},          // id -> { seen, correct, wrong, streak, bestStreak, lastCorrect, pronOk, pronTotal }
       settings: {
-        difficulty: 'medium',   // easy | medium | hard
+        level: 1,                // 学生自选水平：0 入门 1 进阶 2 挑战
         count: 10,              // 每次抽题数量
         voice: 'default'        // 朗读音色偏好
       },
