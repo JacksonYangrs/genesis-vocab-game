@@ -204,7 +204,10 @@ def main() -> int:
 
     shards = {}
     for word, info in kept.items():
-        letter = word[0]
+        # 文件名统一小写：macOS/Windows 文件系统不区分大小写，
+        # 会出现 C.json.gz 与 c.json.gz 互相覆盖，
+        # 而 GitHub Pages 的路径区分大小写 → 线上 404。
+        letter = word[0].lower()
         shards.setdefault(letter, {})[word] = info
 
     shard_total_gz = 0
