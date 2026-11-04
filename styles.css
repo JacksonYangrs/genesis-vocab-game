@@ -1472,3 +1472,235 @@ h1, h2, h3, p { margin: 0; }
   .l-desc { min-height: 2.6em; }
   .course-list { max-width: 560px; }
 }
+
+/* ==========================================================
+   阶段报告
+   ========================================================== */
+
+.report-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+.ri-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.ri-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 17px;
+  font-weight: 600;
+}
+.ri-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ri-text b { font-size: 15px; color: var(--text); font-weight: 600; }
+.ri-text small { font-size: 11.5px; color: var(--text-3); }
+.ri-edit { flex-shrink: 0; }
+
+.report-hero {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.rh-item {
+  padding: 11px 6px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+}
+.rh-num {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary-dark);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.rh-label { font-size: 10.5px; color: var(--text-3); margin-top: 2px; }
+.rh-delta { display: block; font-size: 10.5px; font-weight: 500; }
+.rh-delta.up { color: var(--success); }
+.rh-delta.down { color: var(--danger); }
+
+.report-comment {
+  padding: 14px 15px;
+  background: var(--primary-soft);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-s);
+  margin-bottom: 16px;
+}
+.rc-main { font-size: 14px; color: var(--text); line-height: 1.65; margin: 0; font-weight: 500; }
+.rc-sub { font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin: 6px 0 0; }
+
+/* 趋势图 */
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 130px;
+  padding: 8px 2px 0;
+}
+.tr-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  min-width: 0;
+}
+.tr-bar {
+  width: 100%;
+  max-width: 34px;
+  border-radius: 5px 5px 0 0;
+  position: relative;
+  min-height: 4px;
+  transition: height .3s;
+}
+.tr-bar.good { background: var(--success); }
+.tr-bar.mid { background: var(--warn); }
+.tr-bar.low { background: var(--danger); }
+.tr-val {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tr-label { font-size: 9.5px; color: var(--text-3); margin-top: 5px; white-space: nowrap; }
+
+/* 弱项列表 */
+.report-weak { display: flex; flex-direction: column; gap: 6px; }
+.rw-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+}
+.rw-main { flex: 1; min-width: 0; }
+.rw-top { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.rw-word { font-size: 14px; font-weight: 600; color: var(--text); }
+.rw-ipa { font-size: 11px; color: var(--text-3); font-family: ui-monospace, Menlo, monospace; }
+.rw-acc {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.rw-cn { font-size: 12px; color: var(--text-2); margin-top: 2px; line-height: 1.45; }
+.rw-stat {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.rw-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-s);
+}
+
+/* 建议 */
+.report-suggest { display: flex; flex-direction: column; gap: 9px; }
+.sg-item {
+  display: flex;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.sg-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 昵称输入 */
+.name-input {
+  width: 100%;
+  padding: 11px 13px;
+  margin-bottom: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+}
+.name-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+@media (min-width: 640px) {
+  .report-hero { gap: 10px; }
+  .rh-item { padding: 14px 8px; }
+  .rh-num { font-size: 21px; }
+}
+
+/* ---------- 昵称提示条 ---------- */
+
+.name-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  padding: 10px 14px;
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  margin-bottom: 16px;
+}
+.name-bar.done { background: var(--surface); }
+.nb-text { font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
+.name-bar.done .nb-text { color: var(--text); font-weight: 500; }
+.nb-btn { flex-shrink: 0; padding: 6px 13px; font-size: 12.5px; }
+
+/* ---------- 昵称提示条 ---------- */
+
+.name-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  padding: 10px 14px;
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  margin-bottom: 16px;
+}
+.name-bar.done { background: var(--surface); }
+.nb-text { font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
+.name-bar.done .nb-text { color: var(--text); font-weight: 500; }
+.nb-btn { flex-shrink: 0; padding: 6px 13px; font-size: 12.5px; }

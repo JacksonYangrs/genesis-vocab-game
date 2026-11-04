@@ -58,7 +58,8 @@
         word: key,
         phonetic: toIPA(hit.p),
         rawPhonetic: hit.p,
-        meaning: hit.c,
+        meaning: meaningOf(key, hit.c),
+        fullMeaning: hit.c,
         pos: hit.t,
         forms: hit.e,
         freq: hit.f
@@ -178,6 +179,51 @@
   }
 
   /**
+   * 精简释义：只取第一个义项，控制在 12 个字以内。
+   *
+   * ECDICT 的 translation 是完整词典释义，动辄几十字
+   * （如 earth → "n. 地球，泥土，世界，尘世；vt. 埋入土中，掘入洞穴；vi. 躲入洞穴"），
+   * 直接用在题目选项和反馈面板里既挤又乱。
+   *
+   * 英语学习场景只需要「这个词最常用的那个意思」。
+   */
+  function shortMeaning(raw) {
+    if (!raw) return '';
+    var s = String(raw).trim();
+
+    // 切出义项：形如 "n. 释义; a. 释义; vt. 释义"
+    var items = s.split(';').map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!items.length) return s;
+
+    // 优先名词义项（英语学习里最常用），其次动词，最后第一个
+    var chosen = '';
+    for (var i = 0; i < items.length; i++) {
+      if (/^n\.?\s/i.test(items[i])) { chosen = items[i]; break; }
+    }
+    if (!chosen) {
+      for (var j = 0; j < items.length; j++) {
+        if (/^v(t)?\.?\s/i.test(items[j])) { chosen = items[j]; break; }
+      }
+    }
+    if (!chosen) chosen = items[0];
+
+    // 去掉词性前缀
+    var first = chosen.replace(/^[a-z]+\.?\s*/i, '').trim();
+    if (!first) first = chosen;
+
+    // 去掉方括号补充说明
+    first = first.replace(/\[[^\]]*\]/g, '').trim();
+
+    // 过长则截断
+    if (first.length > 12) {
+      var comma = first.indexOf(',');
+      if (comma > 0 && comma <= 12) first = first.slice(0, comma);
+      else if (first.length > 16) first = first.slice(0, 14) + '…';
+    }
+    return first;
+  }
+
+  /**
    * ASCII 音标 → IPA
    * ECDICT 用的是 ASCII 风格：'bærәn / bi'giniŋ / 'ɒ:riŋ
    * 需要转换为主流 IPA：/bærən/ / /bɪˈɡɪnɪŋ/ / /ɒːrɪŋ/
@@ -223,7 +269,39 @@
     return '/' + out + '/';
   }
 
+  /**
+   * 人工校准：ECDICT 缺义项或义项不匹配教学场景的词。
+   * 与 scripts/build-course.py 的 MEANING_OVERRIDE 保持一致。
+   * 教师端导入新材料时也走这套，保证课程包与内置课程口径一致。
+   */
+  var MEANING_OVERRIDE = {
+    "moving": "移动的, 活动的",
+    "heavens": "诸天, 天空",
+    "created": "创造了",
+    "barren": "荒芜的, 贫瘠的",
+    "roaring": "咆哮的, 轰鸣的",
+    "beginning": "开始, 起初",
+    "darkness": "黑暗",
+    "ocean": "海洋, 大海",
+    "spirit": "灵, 圣灵",
+    "heaven": "天堂, 天",
+    "god": "上帝, 神",
+    "life": "生命, 生活",
+    "form": "形状, 形式",
+    "earth": "地球, 大地",
+    "water": "水",
+    "move": "移动, 运动",
+    "create": "创造, 创作"
+  };
+
+  function meaningOf(word, raw) {
+    var ov = MEANING_OVERRIDE[String(word || '').toLowerCase()];
+    return ov || shortMeaning(raw);
+  }
+
   Lexicon.toIPA = toIPA;
+  Lexicon.shortMeaning = shortMeaning;
+  Lexicon.MEANING_OVERRIDE = MEANING_OVERRIDE;
 
   global.Lexicon = Lexicon;
 })(window);

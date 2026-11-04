@@ -63,7 +63,7 @@
 
   /* ============ 视图切换 ============ */
 
-  var VIEWS = ['home', 'quiz', 'result', 'progress', 'wordlist', 'pronounce', 'teacher'];
+  var VIEWS = ['home', 'quiz', 'result', 'progress', 'wordlist', 'pronounce', 'report', 'teacher'];
 
   function showView(name) {
     VIEWS.forEach(function (v) {
@@ -88,6 +88,24 @@
     renderCountSeg();
     renderHeroStats();
     renderWrongCount();
+    renderNameBar();
+  }
+
+  /** 昵称提示条：没填昵称时显示一行引导 */
+  function renderNameBar() {
+    if (!els.nameBar) return;
+    var id = Store.identity();
+    if (id.name) {
+      els.nameBar.hidden = false;
+      els.nameBarText.textContent = '当前身份：' + id.name;
+      els.nameBar.classList.add('done');
+      els.btnNameBar.textContent = '改名';
+    } else {
+      els.nameBar.hidden = false;
+      els.nameBarText.textContent = '填个昵称，学习报告就能标识你的成绩';
+      els.nameBar.classList.remove('done');
+      els.btnNameBar.textContent = '填昵称';
+    }
   }
 
   /** 课程列表 */
@@ -1041,6 +1059,158 @@
     });
   }
 
+  /* ============ 阶段报告 ============ */
+
+  function renderReport() {
+    var words = currentWords();
+    var rep = Store.buildReport(words);
+    var id = Store.identity();
+
+    // 身份卡
+    els.reportIdentity.innerHTML =
+      '<div class="ri-left">' +
+        '<span class="ri-avatar">' + esc((id.name || '?').charAt(0).toUpperCase()) + '</span>' +
+        '<div class="ri-text">' +
+          '<b>' + esc(id.name || '未设置昵称') + '</b>' +
+          '<small>' + (id.joinedAt
+            ? '加入于 ' + new Date(id.joinedAt).toLocaleDateString('zh-CN')
+            : '第一次使用本工具') + '</small>' +
+        '</div>' +
+      '</div>' +
+      '<button class="btn-soft ri-edit" id="btn-edit-name">改昵称</button>';
+
+    var editBtn = document.getElementById('btn-edit-name');
+    if (editBtn) {
+      editBtn.addEventListener('click', function () { openNameModal(); });
+    }
+
+    // 总览
+    var deltaHtml = '';
+    if (rep.delta != null) {
+      var up = rep.delta >= 0;
+      deltaHtml = '<span class="rh-delta ' + (up ? 'up' : 'down') + '">' +
+        (up ? '↑' : '↓') + ' ' + Math.abs(rep.delta) + '%</span>';
+    }
+    els.reportHero.innerHTML =
+      '<div class="rh-item"><div class="rh-num">' + rep.totalTests + '</div><div class="rh-label">完成测试</div></div>' +
+      '<div class="rh-item"><div class="rh-num">' + (rep.overallAccuracy ? rep.overallAccuracy + '%' : '—') + deltaHtml + '</div><div class="rh-label">平均正确率</div></div>' +
+      '<div class="rh-item"><div class="rh-num">' + rep.mastery.mastered + '</div><div class="rh-label">已掌握词</div></div>' +
+      '<div class="rh-item"><div class="rh-num">' +
+        (rep.pronunciation.total ? Math.round(rep.pronunciation.ok / rep.pronunciation.total * 100) + '%' : '—') +
+        '</div><div class="rh-label">跟读准确</div></div>';
+
+    // 评价
+    els.reportComment.innerHTML =
+      '<p class="rc-main">' + esc(rep.comment) + '</p>' +
+      '<p class="rc-sub">' + esc(rep.suggestion) + '</p>';
+
+    // 趋势图
+    renderTrend(rep.trend);
+
+    // 掌握度
+    var labels = { new: '未练习', weak: '生疏', learning: '巩固中', strong: '熟悉', mastered: '已掌握' };
+    var colors = { new: '#94a3b8', weak: '#b8503f', learning: '#c08a2e', strong: '#4a7fb5', mastered: '#3f7d52' };
+    els.reportMastery.innerHTML = Store.LEVEL_ORDER.map(function (k) {
+      return '<div class="ms-item">' +
+        '<div class="ms-num" style="color:' + colors[k] + '">' + rep.mastery[k] + '</div>' +
+        '<div class="ms-label">' + labels[k] + '</div>' +
+      '</div>';
+    }).join('');
+
+    // 弱项
+    els.reportWeakHint.textContent = rep.weak.length ? (rep.weak.length + ' 个词需要加强') : '';
+    if (rep.weak.length) {
+      els.reportWeak.innerHTML = rep.weak.slice(0, 12).map(function (w) {
+        return '<div class="rw-item">' +
+          '<div class="rw-main">' +
+            '<div class="rw-top">' +
+              '<span class="rw-word">' + esc(w.word) + '</span>' +
+              '<span class="rw-ipa">' + esc(w.phonetic) + '</span>' +
+              '<span class="rw-acc">' + Math.round(w.accuracy * 100) + '%</span>' +
+            '</div>' +
+            '<div class="rw-cn">' + esc(w.meaning) + '</div>' +
+          '</div>' +
+          '<div class="rw-stat">' + w.correct + '/' + w.seen + '</div>' +
+        '</div>';
+      }).join('');
+    } else if (rep.totalTests) {
+      els.reportWeak.innerHTML = '<div class="rw-empty">👍 目前没有反复出错的词，保持住！</div>';
+    } else {
+      els.reportWeak.innerHTML = '<div class="rw-empty">做完测试后这里会列出需要加强的词</div>';
+    }
+
+    // 建议
+    var sug = [];
+    if (rep.weak.length) {
+      sug.push('优先复习这 ' + Math.min(5, rep.weak.length) + ' 个词：' +
+        rep.weak.slice(0, 5).map(function (w) { return w.word; }).join('、'));
+    }
+    if (rep.untouched.length) {
+      sug.push('还有 ' + rep.untouched.length + ' 个词没练过：' +
+        rep.untouched.slice(0, 5).map(function (w) { return w.word; }).join('、') +
+        (rep.untouched.length > 5 ? ' 等' : ''));
+    }
+    if (rep.notMastered.length) {
+      sug.push('已练过但还没掌握牢的：' +
+        rep.notMastered.slice(0, 5).map(function (w) { return w.word; }).join('、'));
+    }
+    if (rep.pronunciation.total && rep.pronunciation.ok / rep.pronunciation.total < 0.7) {
+      sug.push('跟读准确率偏低，建议每天花两分钟练发音');
+    }
+    if (!sug.length) {
+      sug.push(rep.totalTests ? '目前状态很好，可以挑战更高水平了' : '先做一次测试，这里就会给出针对性建议');
+    }
+    els.reportSuggest.innerHTML = sug.map(function (s, i) {
+      return '<div class="sg-item"><span class="sg-num">' + (i + 1) + '</span><span>' + esc(s) + '</span></div>';
+    }).join('');
+  }
+
+  /** 成绩趋势图（纯 CSS 条形） */
+  function renderTrend(trend) {
+    var box = els.reportTrend;
+    if (!trend.length) {
+      box.innerHTML = '<div class="rw-empty">还没有测试记录</div>';
+      return;
+    }
+    var max = 100;
+    box.innerHTML = trend.slice(-12).map(function (t, i, arr) {
+      var d = new Date(t.at);
+      var label = (d.getMonth() + 1) + '/' + d.getDate();
+      var h = Math.max(4, t.accuracy);
+      var cls = t.accuracy >= 80 ? 'good' : (t.accuracy >= 60 ? 'mid' : 'low');
+      return '<div class="tr-item">' +
+        '<div class="tr-bar ' + cls + '" style="height:' + h + '%">' +
+          '<span class="tr-val">' + t.accuracy + '%</span>' +
+        '</div>' +
+        '<span class="tr-label">' + label + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  /** 昵称弹窗 */
+  function openNameModal(onSaved) {
+    els.nameInput.value = Store.identity().name || '';
+    els.nameModal.hidden = false;
+    els._nameOnSaved = onSaved || null;
+    setTimeout(function () { els.nameInput.focus(); }, 100);
+  }
+
+  function saveName() {
+    var v = els.nameInput.value.trim();
+    if (!v) {
+      els.nameInput.classList.add('shake');
+      setTimeout(function () { els.nameInput.classList.remove('shake'); }, 400);
+      return;
+    }
+    Store.setName(v);
+    els.nameModal.hidden = true;
+    toast('已记下你的名字：' + v);
+    var cb = els._nameOnSaved;
+    els._nameOnSaved = null;
+    if (cb) cb();
+    else if (state.view === 'report') renderReport();
+  }
+
   /* ============ 事件绑定 ============ */
 
   function bind() {
@@ -1195,6 +1365,57 @@
       showView('home'); renderHome();
     });
 
+    // 阶段报告
+    els.btnReport.addEventListener('click', function () {
+      if (!Store.hasIdentity()) {
+        // 还没填昵称 —— 先问，报告要用它标识
+        openNameModal(function () { renderReport(); showView('report'); });
+        return;
+      }
+      renderReport();
+      showView('report');
+    });
+    els.btnCloseReport.addEventListener('click', function () {
+      showView('home'); renderHome();
+    });
+    els.btnExportProfile.addEventListener('click', function () {
+      var text = Store.exportProfile();
+      var blob = new Blob([text], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var nm = (Store.identity().name || 'student').replace(/[^\w一-龥-]/g, '');
+      a.href = url;
+      a.download = 'learning-profile-' + nm + '-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast('学习档案已下载，发给老师即可');
+    });
+    els.btnCopyProfile.addEventListener('click', function () {
+      var text = Store.exportProfile();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          toast('已复制到剪贴板');
+        }).catch(function () { toast('复制失败，请用下载方式'); });
+      } else {
+        toast('当前浏览器不支持复制，请用下载方式');
+      }
+    });
+
+    // 昵称
+    els.nameSave.addEventListener('click', saveName);
+    els.nameSkip.addEventListener('click', function () {
+      els.nameModal.hidden = true;
+      els._nameOnSaved = null;
+    });
+    els.nameInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+    });
+    els.btnNameBar.addEventListener('click', function () {
+      openNameModal(function () { renderNameBar(); });
+    });
+
     // 发音训练
     els.btnClosePronounce.addEventListener('click', function () {
       Speech.stop();
@@ -1323,6 +1544,25 @@
       btnWordlist: $('btn-wordlist'),
       btnCloseWordlist: $('btn-close-wordlist'),
       wordlist: $('wordlist'),
+      btnReport: $('btn-report'),
+      btnCloseReport: $('btn-close-report'),
+      reportIdentity: $('report-identity'),
+      reportHero: $('report-hero'),
+      reportComment: $('report-comment'),
+      reportTrend: $('report-trend'),
+      reportMastery: $('report-mastery'),
+      reportWeak: $('report-weak'),
+      reportWeakHint: $('report-weak-hint'),
+      reportSuggest: $('report-suggest'),
+      btnExportProfile: $('btn-export-profile'),
+      btnCopyProfile: $('btn-copy-profile'),
+      nameModal: $('name-modal'),
+      nameInput: $('name-input'),
+      nameSave: $('name-save'),
+      nameSkip: $('name-skip'),
+      nameBar: $('name-bar'),
+      nameBarText: $('name-bar-text'),
+      btnNameBar: $('btn-name-bar'),
       btnClosePronounce: $('btn-close-pronounce'),
       pronWord: $('pron-word'),
       pronIpa: $('pron-ipa'),
@@ -1389,6 +1629,10 @@
     });
 
     renderHome();
+
+    // 昵称不主动打断：只在学生打开「学习报告」时若还没设置，才提示一次。
+    // 理由：首次进入就弹窗会挡住页面，用户还没做任何事就被要求填名字，体验差。
+    // 想主动填昵称的，首页顶部有一条轻提示可点。
   }
 
   if (document.readyState === 'loading') {

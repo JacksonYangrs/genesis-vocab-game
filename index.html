@@ -25,6 +25,7 @@
       </div>
       <div class="topbar-actions">
         <button class="icon-btn" id="btn-progress" title="掌握情况" aria-label="掌握情况">📊</button>
+        <button class="icon-btn" id="btn-report" title="学习报告" aria-label="学习报告">📈</button>
         <button class="icon-btn" id="btn-wordlist" title="生词表" aria-label="生词表">📚</button>
         <button class="icon-btn" id="btn-teacher" title="教师模式" aria-label="教师模式">🎓</button>
       </div>
@@ -45,6 +46,12 @@
         <h1 class="hero-title">Learn · Play · Remember</h1>
         <p class="hero-verse" id="hero-verse">「起初，神创造了诸天和大地。大地空荒，毫无生命的形态；是被咆哮的海洋覆盖着的黑暗。但神的灵在水面上运行。」</p>
         <div class="hero-stats" id="hero-stats"></div>
+      </div>
+
+      <!-- 昵称提示条 -->
+      <div class="name-bar" id="name-bar" hidden>
+        <span class="nb-text" id="name-bar-text"></span>
+        <button class="btn-soft nb-btn" id="btn-name-bar">填昵称</button>
       </div>
 
       <div class="section">
@@ -279,6 +286,72 @@
       <div class="pron-index" id="pron-index"></div>
     </section>
 
+    <!-- ========== 阶段报告 ========== -->
+    <section class="view view-report" id="view-report" hidden>
+      <div class="section-head page-head">
+        <h2>📈 学习报告</h2>
+        <button class="icon-btn" id="btn-close-report">✕</button>
+      </div>
+
+      <!-- 身份卡 -->
+      <div class="report-identity" id="report-identity"></div>
+
+      <!-- 总览 -->
+      <div class="report-hero" id="report-hero"></div>
+
+      <!-- 评价 -->
+      <div class="report-comment" id="report-comment"></div>
+
+      <!-- 成绩趋势 -->
+      <div class="section">
+        <div class="section-head"><h2>成绩趋势</h2></div>
+        <div class="card">
+          <div class="trend-chart" id="report-trend"></div>
+        </div>
+      </div>
+
+      <!-- 掌握度 -->
+      <div class="section">
+        <div class="section-head"><h2>掌握度分布</h2></div>
+        <div class="card">
+          <div class="mastery-summary" id="report-mastery"></div>
+        </div>
+      </div>
+
+      <!-- 弱项 -->
+      <div class="section">
+        <div class="section-head">
+          <h2>需要加强的词</h2>
+          <span class="section-hint" id="report-weak-hint"></span>
+        </div>
+        <div class="report-weak" id="report-weak"></div>
+      </div>
+
+      <!-- 建议 -->
+      <div class="section">
+        <div class="section-head"><h2>下一步建议</h2></div>
+        <div class="card">
+          <div class="report-suggest" id="report-suggest"></div>
+        </div>
+      </div>
+
+      <!-- 导出 -->
+      <div class="section">
+        <div class="section-head">
+          <h2>导出学习档案</h2>
+          <span class="section-hint">发给老师汇总</span>
+        </div>
+        <div class="manage-row">
+          <button class="btn-secondary" id="btn-export-profile">⬇️ 下载档案</button>
+          <button class="btn-secondary" id="btn-copy-profile">📋 复制</button>
+        </div>
+        <p class="page-note" style="margin-top:10px">
+          档案包含你的昵称、每次测试成绩、每个词的掌握情况。<br>
+          把它发给老师，老师就能汇总出全班的阶段学习情况 —— 不会包含你的密码或联系方式。
+        </p>
+      </div>
+    </section>
+
     <!-- ========== 教师模式 ========== -->
     <section class="view view-teacher" id="view-teacher" hidden>
       <div class="section-head page-head">
@@ -344,6 +417,20 @@
       <div class="modal-actions">
         <button class="btn-ghost" id="modal-cancel">取消</button>
         <button class="btn-danger" id="modal-confirm">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 昵称设置弹窗 ========== -->
+  <div class="modal-backdrop" id="name-modal" hidden>
+    <div class="modal">
+      <h3>你好，请留下你的名字</h3>
+      <p>用于在学习报告里标识你 —— 填个昵称或学名缩写就行，不需要密码。</p>
+      <input type="text" id="name-input" class="name-input" maxlength="24"
+             placeholder="例如：David / 陈姐妹 / S2" autocomplete="off">
+      <div class="modal-actions">
+        <button class="btn-ghost" id="name-skip">稍后再说</button>
+        <button class="btn-primary" id="name-save">保存</button>
       </div>
     </div>
   </div>

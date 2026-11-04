@@ -96,6 +96,71 @@ def quantile(values, q):
     return s[lo] + (s[hi] - s[lo]) * (pos - lo)
 
 
+def short_meaning(raw):
+    """精简释义：取一个义项，控制在 12 字以内。
+
+    与 js/lexicon.js 的 shortMeaning() 保持一致。
+    ECDICT 的 translation 是完整词典释义，动辄几十字，
+    直接用在题目选项和反馈面板里既挤又乱。
+
+    选取策略：优先名词义项 → 动词义项 → 第一个义项。
+    """
+    if not raw:
+        return ""
+    s = raw.strip()
+    items = [x.strip() for x in s.split(";") if x.strip()]
+    if not items:
+        return s
+
+    chosen = ""
+    for it in items:
+        if re.match(r"^n\.?\s", it, re.I):
+            chosen = it
+            break
+    if not chosen:
+        for it in items:
+            if re.match(r"^v(t)?\.?\s", it, re.I):
+                chosen = it
+                break
+    if not chosen:
+        chosen = items[0]
+
+    first = re.sub(r"^[a-z]+\.?\s*", "", chosen, flags=re.I).strip()
+    if not first:
+        first = chosen
+    first = re.sub(r"\[[^\]]*\]", "", first).strip()
+    if len(first) > 12:
+        comma = first.find(",")
+        if 0 < comma <= 12:
+            first = first[:comma]
+        elif len(first) > 16:
+            first = first[:14] + "…"
+    return first
+
+
+# 人工校准：ECDICT 缺义项或义项不匹配教学场景的词
+# （moving 只有"动人的"没有"移动的"；heavens 的义项格式特殊）
+MEANING_OVERRIDE = {
+    "moving":   "移动的, 活动的",
+    "heavens":  "诸天, 天空",
+    "created":  "创造了",
+    "barren":   "荒芜的, 贫瘠的",
+    "roaring":  "咆哮的, 轰鸣的",
+    "beginning": "开始, 起初",
+    "darkness": "黑暗",
+    "ocean":    "海洋, 大海",
+    "spirit":   "灵, 圣灵",
+    "heaven":   "天堂, 天",
+    "god":      "上帝, 神",
+    "life":     "生命, 生活",
+    "form":     "形状, 形式",
+    "earth":    "地球, 大地",
+    "water":    "水",
+    "move":     "移动, 运动",
+    "create":   "创造, 创作",
+}
+
+
 def difficulty(word, info):
     """与 js/lexicon.js 的 difficulty() 保持一致"""
     score = 0
@@ -192,8 +257,9 @@ def main():
             for other in lst:
                 if len(cn) >= 3:
                     break
-                m = other["info"]["c"]
-                if m != item["info"]["c"] and m not in cn:
+                ow = other["word"]
+                m = MEANING_OVERRIDE.get(ow, short_meaning(other["info"]["c"]))
+                if m != MEANING_OVERRIDE.get(w, short_meaning(item["info"]["c"])) and m not in cn:
                     cn.append(m)
 
             example = ""
@@ -208,7 +274,8 @@ def main():
                 "id": "w_" + w,
                 "word": w,
                 "phonetic": item["info"]["p"],
-                "meaning": item["info"]["c"],
+                "meaning": MEANING_OVERRIDE.get(w, short_meaning(item["info"]["c"])),
+                "fullMeaning": item["info"]["c"],
                 "pos": item["info"]["t"],
                 "level": lv,
                 "score": item["score"],
