@@ -55,6 +55,38 @@
     return null;
   }
 
+  /**
+   * 经文引言只取第一句 —— 完整段落会占满手机首屏，
+   * 而引言的作用是「点题」，不是全文展示。
+   *
+   * 中英文标点不同，要分别处理：
+   *   英文句号 . ! ?
+   *   中文句号 。！？ 以及全角分号 ；
+   */
+  function shortenVerse(text) {
+    if (!text) return '';
+    var t = String(text).trim();
+
+    // 先去掉中文引号包裹的引号（「」""），避免影响切分
+    var t2 = t.replace(/^[「『""']+|[」』""']+$/g, '');
+
+    // 中英文句末标点都算。
+    // 注意两点：
+    //   1. 分号不算句末 —— 中文经文用分号连接并列短句，按分号切会得到半句话
+    //   2. 标点后不要求跟空白 —— 中文句号后直接接下一个字
+    var m = t2.match(/^(.+?[.!?。！？])/);
+    var first = m ? m[1] : t2;
+
+    // 过长（没有句末标点）则按字符截断
+    if (first.length > 160) {
+      first = first.slice(0, 157).replace(/\s+\S*$/, '') + '…';
+    }
+
+    // 如果原本有中文引号包裹，保留回来
+    var wrapped = /^[「『]/.test(t);
+    return wrapped ? '「' + first + '」' : first;
+  }
+
   function fmtTime(sec) {
     if (sec < 60) return sec + ' 秒';
     var m = Math.floor(sec / 60), s = sec % 60;
@@ -227,6 +259,16 @@
     var course = window.Course ? window.Course.active() : null;
     var words = course ? course.words : VOCAB;
     if (!words.length) words = VOCAB;
+
+    // 经文引言：中文在上、英文在下（学习者正好对照）
+    var meta = window.Course ? window.Course.activeMeta() : null;
+    if (meta) {
+      // 中文引言同样只取首句，与英文对齐（引言的作用是点题，不是全文）
+      if (meta.quote) els.heroVerse.textContent = shortenVerse(meta.quote);
+      els.heroVerseEn.textContent = shortenVerse(meta.quoteEn);
+      els.heroVerseEn.hidden = !meta.quoteEn;
+      els.heroEyebrow.textContent = meta.reference || meta.subtitle || 'Genesis 1:1–2 CEV';
+    }
 
     var counts = Store.levelCounts(words);
     var mastered = counts.mastered + counts.strong;
@@ -1497,6 +1539,9 @@
       btnTeacherPreview: $('btn-teacher-preview'),
       exportBox: $('export-box'),
       heroStats: $('hero-stats'),
+      heroVerse: $('hero-verse'),
+      heroVerseEn: $('hero-verse-en'),
+      heroEyebrow: $('hero-eyebrow'),
       progressStrip: $('progress-strip'),
       progressFill: $('progress-fill'),
       progressText: $('progress-text'),
@@ -1607,6 +1652,7 @@
       subtitle: 'CEV · Genesis 1:1-2',
       reference: 'Genesis 1:1-2 (CEV)',
       quote: '「起初，神创造了诸天和大地。大地空荒，毫无生命的形态；是被咆哮的海洋覆盖着的黑暗。但神的灵在水面上运行。」',
+      quoteEn: 'In the beginning God created the heavens and the earth. The earth was barren, with no form of life; it was under a roaring ocean covered with darkness. But the Spirit of God was moving over the water.',
       words: VOCAB.map(function (w) {
         return {
           id: w.id, word: w.word, phonetic: w.phonetic, meaning: w.meaning,

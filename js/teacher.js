@@ -238,6 +238,19 @@
         return { text: s.text, target: s.target, level: s.level };
       });
 
+      // 经文引言：优先取材料里第一句完整的英文句子
+      var quoteEn = meta.quoteEn || '';
+      if (!quoteEn && sentences.length) {
+        // 取最长的一句（通常是完整段落而非从句）
+        var longest = sentences.slice().sort(function (a, b) {
+          return b.text.length - a.text.length;
+        })[0];
+        quoteEn = longest.text;
+      }
+      if (!quoteEn && this.parsed && this.parsed.sentences.length) {
+        quoteEn = this.parsed.sentences[0];
+      }
+
       var id = meta.id || slugify(meta.title || 'course');
       var data = {
         id: id,
@@ -245,6 +258,7 @@
         subtitle: meta.subtitle || '',
         reference: meta.reference || '',
         quote: meta.quote || '',
+        quoteEn: quoteEn,
         createdAt: Date.now(),
         thresholds: global.Lexicon.lastThresholds,
         words: words,

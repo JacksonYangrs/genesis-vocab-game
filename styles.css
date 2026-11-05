@@ -105,7 +105,18 @@ h1, h2, h3, p { margin: 0; }
 }
 
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.brand-mark { font-size: 24px; line-height: 1; }
+.brand-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.brand-mark svg { width: 20px; height: 20px; display: block; }
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .brand-text strong { font-size: 16px; letter-spacing: 0.2px; }
 .brand-text small { font-size: 11.5px; color: var(--text-3); letter-spacing: 0.4px; }
@@ -117,10 +128,21 @@ h1, h2, h3, p { margin: 0; }
   border-radius: 11px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  font-size: 17px;
+  color: var(--primary);
   display: grid;
   place-items: center;
-  transition: transform .15s, background .15s;
+  transition: transform .15s, background .15s, border-color .15s, color .15s;
+  cursor: pointer;
+}
+.icon-btn svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+.icon-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
 }
 .icon-btn:active { transform: scale(.92); background: var(--primary-soft); }
 
@@ -157,7 +179,7 @@ h1, h2, h3, p { margin: 0; }
 /* ========== 首页 Hero ========== */
 
 .hero {
-  background: linear-gradient(140deg, #7d5730 0%, #9a6f3f 48%, #b8894a 100%);
+  background: linear-gradient(158deg, #9c7040 0%, #b08149 42%, #c69a5c 100%);
   color: #fff;
   border-radius: var(--radius-l);
   padding: 24px 22px;
@@ -189,7 +211,7 @@ h1, h2, h3, p { margin: 0; }
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent);
 }
-.hero-rule span { font-size: 10px; letter-spacing: 2px; }
+.hero-rule span { font-size: 11px; letter-spacing: 2px; opacity: .8; }
 
 .hero-eyebrow {
   font-size: 12px;
@@ -205,6 +227,19 @@ h1, h2, h3, p { margin: 0; }
   opacity: .92;
   padding-left: 12px;
   border-left: 2px solid rgba(255,255,255,.35);
+}
+
+/* 英文经文：与中文对照，衬线斜体更像经卷排印 */
+.hero-verse-en {
+  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.72;
+  opacity: .95;
+  margin-top: 9px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(255,255,255,.3);
+  letter-spacing: .1px;
 }
 .hero-stats {
   display: grid;

@@ -72,6 +72,7 @@
               subtitle: meta.subtitle || '',
               reference: meta.reference || '',
               quote: meta.quote || '',
+              quoteEn: meta.quoteEn || '',
               wordCount: meta.wordCount || 0,
               levelCounts: meta.levelCounts || { 0: 0, 1: 0, 2: 0 },
               file: meta.file,
@@ -112,6 +113,7 @@
           meta.wordCount = data.words.length;
           meta.levelCounts = countLevels(data.words);
           meta.quote = data.quote || '';
+          meta.quoteEn = data.quoteEn || '';
           meta.reference = data.reference || '';
           return data;
         });
@@ -168,6 +170,7 @@
         subtitle: data.subtitle || '',
         reference: data.reference || '',
         quote: data.quote || '',
+        quoteEn: data.quoteEn || '',
         wordCount: data.words.length,
         levelCounts: countLevels(data.words),
         file: 'local-' + data.id + '.json',
