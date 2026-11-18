@@ -107,11 +107,12 @@
       var key = String(word || '').toLowerCase().trim();
       var hit = this.dict[key];
       if (!hit) return null;
+      var override = PHONETIC_OVERRIDE[key];
       return {
         word: key,
-        phonetic: toIPA(hit.p),
+        phonetic: override || toIPA(hit.p),
         rawPhonetic: hit.p,
-        meaning: meaningOf(key, hit.c),
+        meaning: BIBLE_TERMS[key] || meaningOf(key, hit.c),
         fullMeaning: hit.c,
         pos: hit.t,
         forms: hit.e,
@@ -244,8 +245,9 @@
     if (!raw) return '';
     var s = String(raw).trim();
 
-    // 切出义项：形如 "n. 释义; a. 释义; vt. 释义"
-    var items = s.split(';').map(function (x) { return x.trim(); }).filter(Boolean);
+    // 切出义项：ECDICT 用半角 ";" 或全角 "；" 分隔
+    // （separated 的释义就是全角分号："分居；分开的；不在一起生活的"）
+    var items = s.split(/[;；]/).map(function (x) { return x.trim(); }).filter(Boolean);
     if (!items.length) return s;
 
     // 优先名词义项（英语学习里最常用），其次动词，最后第一个
@@ -267,9 +269,9 @@
     // 去掉方括号补充说明
     first = first.replace(/\[[^\]]*\]/g, '').trim();
 
-    // 过长则截断
+    // 过长则截断（用第一个逗号切，太长则硬截）
     if (first.length > 12) {
-      var comma = first.indexOf(',');
+      var comma = first.indexOf(',') >= 0 ? first.indexOf(',') : first.indexOf('，');
       if (comma > 0 && comma <= 12) first = first.slice(0, comma);
       else if (first.length > 16) first = first.slice(0, 14) + '…';
     }
@@ -281,46 +283,182 @@
    * ECDICT 用的是 ASCII 风格：'bærәn / bi'giniŋ / 'ɒ:riŋ
    * 需要转换为主流 IPA：/bærən/ / /bɪˈɡɪnɪŋ/ / /ɒːrɪŋ/
    */
-  var IPA_MAP = {
-    'a': 'ɑ', 'b': 'b', 'c': 'k', 'd': 'd', 'e': 'ɛ', 'f': 'f',
-    'g': 'ɡ', 'h': 'h', 'i': 'ɪ', 'j': 'dʒ', 'k': 'k', 'l': 'l',
-    'm': 'm', 'n': 'n', 'o': 'ɒ', 'p': 'p', 'q': 'k', 'r': 'r',
-    's': 's', 't': 't', 'u': 'ʌ', 'v': 'v', 'w': 'w', 'x': 'ks',
-    'y': 'j', 'z': 'z'
-  };
+  /**
+   * ECDICT 音标 → 标准 IPA
+   *
+   * 设计原则：**不猜**。
+   *
+   * ECDICT 的音标是混合体：一部分是准 IPA（ˈdʒɛnəsɪs），
+   * 一部分是老式 ASCII 风格（'bi'giniŋ、'da:knis）。
+   *
+   * 关键难点：老式音标里的 `i` 是 /ɪ/，准 IPA 里的 `i` 是 /i/
+   * （happy vowel，如 deuteronomy 的 -mi）。**光看字符无法区分**，
+   * 所以不能做「ASCII 元音 → IPA」的猜测映射 ——
+   * 那会把 deuteronomy 变成 dʌːtəˈrɑːnəmɪ、separated 变成 sɛpərɛɪtɪd。
+   *
+   * 所以这里只做**绝对安全的符号规范化**：
+   *   ' → ˈ   （主重音）      : → ː  （长度符）
+   *   ә → ə   （schwa 另一写法）  g → ɡ  （字形归一）
+   *   组合双元音修正（ɛi→eɪ 这类明确的错写）
+   *
+   * 元音层面的偏差，用 PHONETIC_OVERRIDE 覆盖（见下），不在这里瞎猜。
+   */
+  var IPA_FIXES = [
+    [/:+/g, 'ː'],
+    [/'/g, 'ˈ'],
+    [/ɡ/g, 'ɡ'],
+    [/g/g, 'ɡ'],
+    [/ә/g, 'ə'],
+    // 明确的错写修正（这些组合在任何音标里都不是合法的英式拼法）
+    [/ɛi/g, 'eɪ'],
+    [/ɛə/g, 'eə'],
+    [/ɑi/g, 'aɪ'],
+    [/ɔu/g, 'əʊ'],
+    // ECDICT 老式音标里这些 ASCII 组合是确定的错写，安全修正：
+    //   ei/ai/ay → eɪ    əu → əʊ    ea/ee → iː
+    //   ch→tʃ  sh→ʃ  th→θ  ng→ŋ
+    // 不做「裸 i → ɪ」的全局替换 —— 准 IPA 里 i 是 /i/（happy vowel），
+    // 如 deuteronomy 的 -mi。只修确定的组合。
+    [/ei/g, 'eɪ'],
+    [/ai/g, 'eɪ'],
+    [/ay/g, 'eɪ'],
+    [/əu/g, 'əʊ'],
+    [/ee/g, 'iː'],
+    [/ea/g, 'iː'],
+    [/oo/g, 'uː'],
+    [/ou/g, 'aʊ'],
+    [/ow/g, 'aʊ'],
+    [/oi/g, 'ɔɪ'],
+    [/oy/g, 'ɔɪ'],
+    [/ch/g, 'tʃ'],
+    [/sh/g, 'ʃ'],
+    [/th/g, 'θ'],
+    [/ng/g, 'ŋ'],
+    [/ːː+/g, 'ː'],
+    [/['']/g, "'"]
+  ];
 
   function toIPA(raw) {
     if (!raw) return '';
-    var s = String(raw).trim().replace(/^[\/'\"]+|[\/'\"]+$/g, '');
+    var s = String(raw).trim().replace(/^\/+|\/+$/g, '').replace(/^'+|'+$/g, '');
     if (!s) return '';
 
-    // 重音符号：ECDICT 用 ' 标主重音
-    s = s.replace(/'/g, 'ˈ');
-
-    var out = '';
-    for (var i = 0; i < s.length; i++) {
-      var ch = s[i];
-      // 已是 IPA 字符的直接保留
-      if ('əɑɒɔɛɪʊʌɡθðʃʒŋʒðˈːˌɜɚaeiouæøy'.indexOf(ch) >= 0 && IPA_MAP[ch] === undefined) {
-        out += ch;
-        continue;
-      }
-      if (IPA_MAP[ch] !== undefined) {
-        out += IPA_MAP[ch];
-        continue;
-      }
-      out += ch;
+    for (var i = 0; i < IPA_FIXES.length; i++) {
+      s = s.replace(IPA_FIXES[i][0], IPA_FIXES[i][1]);
     }
 
-    // 长音符号
-    out = out.replace(/:/g, 'ː');
-    // 双元音与常见组合修正
-    out = out.replace(/ɪə/g, 'ɪə').replace(/ʊə/g, 'ʊə').replace(/eɪ/g, 'eɪ');
-    // 清理重复
-    out = out.replace(/ːː/g, 'ː');
+    // 只保留 IPA 合法字符
+    // 注意：ɡ（U+0261，IPA 的 g）必须在列表里，
+    // 否则上面刚做的 g→ɡ 归一会把它当非法字符删掉
+    // （实测 beginning 的音标因此丢了 g 变成 biˈiniŋ）
+    s = s.replace(/[^a-zɑɒɔɛɪʊʌæɜəɚʃʒŋθðɡˈˌː().·\-\s]/gi, '');
 
-    return '/' + out + '/';
+    return '/' + s.trim() + '/';
   }
+
+  /**
+   * 圣经专有名词标准译法表
+   *
+   * 问题：通用词典给的是「词的一般义项」，但在圣经学习场景里
+   *   genesis → "发生, 起源, 创世记"   ← 学生要的是「创世记」
+   *   exodus  → "大批的离去"            ← 应为「出埃及记」
+   *   numbers → "数"                   ← 应为「民数记」
+   *
+   * 原因：ECDICT 是通用英汉词典，不区分「圣经书名」这个专名用法。
+   * 这里补一份圣经场景的专名标准译法，优先级高于通用义项。
+   *
+   * 覆盖范围：66 卷书名 + 常见圣经专名（人物、地名、节期、概念）。
+   */
+  var BIBLE_TERMS = {
+    // ---------- 旧约 39 卷 ----------
+    "genesis": "创世记", "exodus": "出埃及记", "leviticus": "利未记",
+    "numbers": "民数记", "deuteronomy": "申命记", "joshua": "约书亚记",
+    "judges": "士师记", "ruth": "路得记", "samuel": "撒母耳记上",
+    "kings": "列王纪上", "chronicles": "历代志上", "ezra": "以斯拉记",
+    "nehemiah": "尼希米记", "esther": "以斯帖记", "job": "约伯记",
+    "psalms": "诗篇", "psalm": "诗篇", "proverbs": "箴言", "ecclesiastes": "传道书",
+    "song": "雅歌", "songofsolomon": "雅歌", "isaiah": "以赛亚书",
+    "jeremiah": "耶利米书", "lamentations": "耶利米哀歌", "ezekiel": "以西结书",
+    "daniel": "但以理书", "hosea": "何西阿书", "joel": "约珥书",
+    "amos": "阿摩司书", "obadiah": "俄巴底亚书", "jonah": "约拿书",
+    "micah": "弥迦书", "nahum": "那鸿书", "habakkuk": "哈巴谷书",
+    "zephaniah": "西番雅书", "haggai": "哈该书", "zechariah": "撒迦利亚书",
+    "malachi": "玛拉基书",
+
+    // ---------- 新约 27 卷 ----------
+    "matthew": "马太福音", "mark": "马可福音", "luke": "路加福音",
+    "john": "约翰福音", "acts": "使徒行传", "romans": "罗马书",
+    "corinthians": "哥林多前书", "galatians": "加拉太书", "ephesians": "以弗所书",
+    "philippians": "腓立比书", "colossians": "歌罗西书", "thessalonians": "帖撒罗尼迦前书",
+    "timothy": "提摩太前书", "titus": "提多书", "philemon": "腓利门书",
+    "hebrews": "希伯来书", "james": "雅各书", "peter": "彼得前书",
+    "johns": "约翰一书", "jude": "犹大书", "revelation": "启示录",
+
+    // ---------- 常见圣经专名 ----------
+    "adam": "亚当", "eve": "夏娃", "noah": "挪亚", "abraham": "亚伯拉罕",
+    "abram": "亚伯兰", "isaac": "以撒", "jacob": "雅各", "israel": "以色列",
+    "moses": "摩西", "aaron": "亚伦", "joshua1": "约书亚", "caleb": "迦勒",
+    "samson": "参孙", "delilah": "黛莉拉", "david": "大卫", "solomon": "所罗门",
+    "elijah": "以利亚", "elisha": "以利沙", "jonah1": "约拿",
+    "daniel1": "但以理", "zelbabel": "别西八", "mordecai": "末底改",
+    "esther1": "以斯帖", "nehemiah1": "尼希米", "job1": "约伯",
+    "moses1": "摩西", "joseph": "约瑟", "pharaoh": "法老",
+    "angel": "天使", "angels": "天使", "spirit": "灵", "gospel": "福音",
+    "apostle": "使徒", "apostles": "使徒", "church": "教会",
+    "christ": "基督", "jesus": "耶稣", "messiah": "弥赛亚",
+    "savior": "救主", "lord": "主", "god": "上帝",
+    "sin": "罪", "grace": "恩典", "faith": "信心", "hope": "希望",
+    "love": "爱", "prayer": "祷告", "prayer1": "祷告",
+    "baptism": "洗礼", "communion": "圣餐", "resurrection": "复活",
+    "salvation": "救恩", "redemption": "救赎", "covenant": "约",
+    "temple": "圣殿", "altar": "祭坛", "sacrifice": "献祭",
+    "tabernacle": "会幕", "ark": "约柜", "altar1": "祭坛",
+    "covenant1": "约", "prophecy": "预言", "prophets": "先知",
+    "psalm1": "诗篇", "hymn": "诗歌", "parable": "比喻",
+    "miracle": "神迹", "miracles": "神迹", "disciple": "门徒",
+    "disciples": "门徒", "worship": "敬拜", "prayer2": "祷告",
+    "fast": "禁食", "holiday": "节期", "festival": "节期",
+    "passover": "逾越节", "pentecost": "五旬节", "sabbath": "安息日",
+    "sinai": "西奈山", "zion": "锡安", "jerusalem": "耶路撒冷",
+    "jericho": "耶利哥", "babylon": "巴比伦", "egypt": "埃及",
+    "canaan": "迦南", "gilead": "基列", "jordan": "约旦河",
+    "galilee": "加利利", "bethlehem": "伯利恒", "nazareth": "拿撒勒",
+    "damascus": "大马士革", "rome": "罗马", "athens": "雅典"
+  };
+
+  /**
+   * 音标人工校准表
+   *
+   * 这些是已核对过的标准音标（现代英语词典），
+   * 优先于 ECDICT —— ECDICT 的老式写法在这些词上不准确。
+   * 与 scripts/build-course.py 的 PHONETIC_OVERRIDE 保持一致。
+   */
+  var PHONETIC_OVERRIDE = {
+    "genesis": "/ˈdʒɛnəsɪs/",
+    "exodus": "/ˈɛksədəs/",
+    "leviticus": "/ləˈvɪtɪkəs/",
+    "numbers": "/ˈnʌmbərz/",
+    "deuteronomy": "/ˌduːtəˈrɑːnəmi/",
+    "separated": "/ˈsɛpəreɪtɪd/",
+    // 创世记课程里已核对的词（ECDICT 的老式音标元音不准）
+    "beginning": "/bɪˈɡɪnɪŋ/",
+    "created": "/krɪˈeɪtɪd/",
+    "roaring": "/ˈrɔːɪŋ/",
+    "heavens": "/ˈhɛvənz/",
+    "heaven": "/ˈhɛvən/",
+    "barren": "/ˈbærən/",
+    "darkness": "/ˈdɑːknəs/",
+    "moving": "/ˈmuːvɪŋ/",
+    "ocean": "/ˈəʊʃən/",
+    "spirit": "/ˈspɪrɪt/",
+    "create": "/kriˈeɪt/",
+    "life": "/laɪf/",
+    "earth": "/ɜːθ/",
+    "form": "/fɔːm/",
+    "move": "/muːv/",
+    "water": "/ˈwɔːtə/",
+    "god": "/ɡɒd/"
+  };
 
   /**
    * 人工校准：ECDICT 缺义项或义项不匹配教学场景的词。
@@ -344,7 +482,24 @@
     "earth": "地球, 大地",
     "water": "水",
     "move": "移动, 运动",
-    "create": "创造, 创作"
+    "create": "创造, 创作",
+    // 圣经语境的常用词（通用义项在此处不准确或太长）
+    "separated": "分开的, 分离的",
+    "light": "光, 光亮",
+    "darkness": "黑暗",
+    "day": "日, 白天",
+    "night": "夜, 夜晚",
+    "morning": "早晨, 清晨",
+    "evening": "傍晚, 夜晚",
+    "called": "称为, 呼召",
+    "saw": "看见, 察觉",
+    "said": "说, 讲",
+    "made": "造, 制作",
+    "gave": "给, 赐",
+    "land": "土地, 陆地",
+    "famine": "饥荒",
+    "covered": "覆盖, 遮盖",
+    "called2": "蒙召"
   };
 
   function meaningOf(word, raw) {
@@ -354,6 +509,8 @@
 
   Lexicon.toIPA = toIPA;
   Lexicon.shortMeaning = shortMeaning;
+  Lexicon.PHONETIC_OVERRIDE = PHONETIC_OVERRIDE;
+  Lexicon.BIBLE_TERMS = BIBLE_TERMS;
   Lexicon.MEANING_OVERRIDE = MEANING_OVERRIDE;
 
   global.Lexicon = Lexicon;

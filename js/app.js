@@ -148,7 +148,7 @@
 
     var lib = window.Course ? window.Course.library : [];
     if (!lib.length) {
-      box.innerHTML = '<p class="empty-note">还没有课程。点右上角 🎓 教师模式导入材料生成。</p>';
+      box.innerHTML = '<p class="empty-note">还没有课程。点右上角教师模式导入材料生成。</p>';
       els.courseHint.textContent = '无课程';
       return;
     }
@@ -399,10 +399,10 @@
 
     // 提示
     els.hintRow.hidden = false;
-    els.btnHint.textContent = '💡 看提示';
+    els.btnHint.innerHTML = '<span data-icon="lightbulb"></span> 看提示';
     els.btnHint.disabled = false;
     els.btnHint.onclick = function () {
-      els.btnHint.textContent = '💡 ' + q.hintText;
+      els.btnHint.innerHTML = '<span data-icon="lightbulb"></span> ' + esc(q.hintText);
       els.btnHint.disabled = true;
     };
 
@@ -494,7 +494,8 @@
     var c = Quiz.current.combo;
     if (c >= 2) {
       els.comboFlag.hidden = false;
-      els.comboFlag.textContent = '🔥 连对 ' + c + ' 题' + (c >= 3 ? '（每题 +' + Math.min(10, (c - 2) * 2) + ' 分）' : '');
+      els.comboFlag.innerHTML = '<span class="ic-wrap" data-icon="flame"></span> 连对 ' + c + ' 题' +
+        (c >= 3 ? '（每题 +' + Math.min(10, (c - 2) * 2) + ' 分）' : '');
     } else {
       els.comboFlag.hidden = true;
     }
@@ -643,7 +644,7 @@
     if (sum.wrong) chips += '<span class="chip bad">✗ 答错 ' + sum.wrong + '</span>';
     chips += '<span class="chip">得分 ' + sum.score + '</span>';
     if (sum.nearMiss) chips += '<span class="chip warn">≈ 容错通过 ' + sum.nearMiss + '</span>';
-    if (sum.bestCombo >= 2) chips += '<span class="chip warn">🔥 最长连对 ' + sum.bestCombo + '</span>';
+    if (sum.bestCombo >= 2) chips += '<span class="chip warn"><span class="ic-wrap" data-icon="flame"></span> 最长连对 ' + sum.bestCombo + '</span>';
     els.resultChips.innerHTML = chips;
 
     // 错题清单
@@ -723,7 +724,7 @@
       var stats = r && r.seen
         ? (r.correct + '/' + r.seen + ' 题 · ' + Math.round(acc * 100) + '%')
         : '还没练过';
-      var pron = r && r.pronTotal ? ('🎤 跟读 ' + r.pronOk + '/' + r.pronTotal) : '';
+      var pron = r && r.pronTotal ? ('<span class="ic-wrap" data-icon="mic"></span> 跟读 ' + r.pronOk + '/' + r.pronTotal) : '';
       return '<div class="m-row">' +
         '<span class="m-dot" style="background:' + meta.color + '"></span>' +
         '<div class="m-word"><b>' + esc(w.word) + ' <span style="color:var(--text-3);font-weight:400;font-size:12px">' + esc(w.phonetic || '') + '</span></b>' +
@@ -780,7 +781,7 @@
           '<div class="wl-cn">' + esc(w.meaning || '') + '</div>' +
           (w.example ? '<div class="wl-ex"><i>' + esc(w.example) + '</i></div>' : '') +
         '</div>' +
-        '<button class="wl-speak" data-word="' + esc(w.word) + '" aria-label="播放 ' + esc(w.word) + '">🔊</button>' +
+        '<button class="wl-speak" data-word="' + esc(w.word) + '" aria-label="播放 ' + esc(w.word) + '"><span data-icon="speaker"></span></button>' +
       '</div>';
     }).join('');
 
@@ -832,7 +833,7 @@
       els.recordHint.textContent = '点「开始跟读」录下自己的声音，再和标准音对比';
     }
     els.btnRecord.classList.remove('recording');
-    els.btnRecord.textContent = '🎙️ 开始跟读';
+    els.btnRecord.innerHTML = '<span data-icon="mic"></span> 开始跟读';
     els.btnPlayback.hidden = true;
     els.btnRateOk.classList.remove('rated');
   }
@@ -873,7 +874,7 @@
       Speech.stopRecord();
       recording = false;
       els.btnRecord.classList.remove('recording');
-      els.btnRecord.textContent = '🎙️ 重新跟读';
+      els.btnRecord.innerHTML = '<span data-icon="mic"></span> 重新跟读';
       els.recordHint.textContent = '录音中… 点击「听我的录音」回放对比';
       return;
     }
@@ -881,7 +882,7 @@
     Speech.record().then(function (res) {
       recording = false;
       els.btnRecord.classList.remove('recording');
-      els.btnRecord.textContent = '🎙️ 重新跟读';
+      els.btnRecord.innerHTML = '<span data-icon="mic"></span> 重新跟读';
       if (state.recordUrl) URL.revokeObjectURL(state.recordUrl);
       state.recordUrl = res.url;
       els.btnPlayback.hidden = false;
@@ -892,7 +893,7 @@
     }).catch(function (err) {
       recording = false;
       els.btnRecord.classList.remove('recording');
-      els.btnRecord.textContent = '🎙️ 开始跟读';
+      els.btnRecord.innerHTML = '<span data-icon="mic"></span> 开始跟读';
       els.recordHint.textContent = '⚠️ 录音失败：' + (err && err.message ? err.message : '未知原因');
     });
     recording = true;
@@ -1605,6 +1606,7 @@
       nameInput: $('name-input'),
       nameSave: $('name-save'),
       nameSkip: $('name-skip'),
+      storageWarn: $('storage-warn'),
       nameBar: $('name-bar'),
       nameBarText: $('name-bar-text'),
       btnNameBar: $('btn-name-bar'),
@@ -1631,6 +1633,18 @@
 
     Store.load();
     Speech.init();
+
+    // 存储不可用要立刻告知 —— 微信内置浏览器限制、无痕模式、配额满
+    // 都会导致保存静默失败，用户会以为填了昵称结果下次打开没了。
+    if (!Store.storageAvailable()) {
+      toast('⚠️ 当前浏览器无法保存进度（可能是无痕模式或存储受限）');
+      els.storageWarn.hidden = false;
+    } else {
+      Store.onSaveError = function (errName) {
+        toast('⚠️ 进度保存失败（' + errName + '），数据可能无法保留');
+      };
+    }
+
     bind();
     showView('home');
 

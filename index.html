@@ -7,7 +7,7 @@
 <meta name="description" content="创世记 1:1–2 (CEV) 生词互动测试 —— 英译中、中译英、单词拼写、听音辨词、发音训练">
 <title>创世记 1:1–2 · 词汇挑战</title>
 <link rel="stylesheet" href="styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a6f3f' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 6.6C10.4 5.2 8.2 4.6 4.8 4.6c-.6 0-1 .45-1 1v11c0 .6.45 1 1 1 3.3 0 5.5.6 7.2 2.1 1.7-1.5 3.9-2.1 7.2-2.1.55 0 1-.4 1-1V5.6c0-.55-.45-1-1-1-3.4 0-5.6.6-7.2 2Z'/%3E%3Cpath d='M12 6.6v13.1'/%3E%3C/svg%3E">
 </head>
 <body>
 
@@ -80,6 +80,12 @@
         <button class="btn-soft nb-btn" id="btn-name-bar">填昵称</button>
       </div>
 
+      <!-- 存储不可用警告 -->
+      <div class="storage-warn" id="storage-warn" hidden>
+        <span class="ic-wrap" data-icon="alert"></span>
+        <span>当前浏览器无法保存进度（可能是无痕模式或存储受限）。测试仍可正常进行，但成绩与昵称在关闭页面后会丢失。</span>
+      </div>
+
       <div class="section">
         <div class="section-head">
           <h2>选择课程</h2>
@@ -116,12 +122,12 @@
         <div class="section-head"><h2>专项练习</h2></div>
         <div class="special-grid">
           <button class="special-card" data-special="wrong">
-            <span class="special-icon">🔁</span>
+            <span class="special-icon" data-icon="refresh"></span>
             <span class="special-title">错题复习</span>
             <span class="special-desc" id="wrong-count-desc">还没有错题</span>
           </button>
           <button class="special-card" data-special="pronounce">
-            <span class="special-icon">🎤</span>
+            <span class="special-icon" data-icon="mic"></span>
             <span class="special-title">发音训练</span>
             <span class="special-desc">听标准音 · 跟读录音</span>
           </button>
@@ -132,7 +138,7 @@
     <!-- ========== 答题页 ========== -->
     <section class="view view-quiz" id="view-quiz" hidden>
       <div class="quiz-head">
-        <button class="back-btn" id="btn-quit">✕</button>
+        <button class="back-btn" id="btn-quit" aria-label="退出测试"><span data-icon="close"></span></button>
         <div class="quiz-meta">
           <strong id="quiz-mode-label"></strong>
           <small id="quiz-diff-label"></small>
@@ -155,10 +161,10 @@
         <!-- 听音题：先听再答 -->
         <div class="listen-box" id="listen-box" hidden>
           <button class="big-speaker" id="btn-speak" aria-label="播放发音">
-            <span class="speaker-icon">🔊</span>
+            <span class="speaker-icon" data-icon="speaker"></span>
             <span class="speaker-text">点击播放</span>
           </button>
-          <button class="replay-btn" id="btn-replay" hidden>🔁 再听一次</button>
+          <button class="replay-btn" id="btn-replay" hidden><span data-icon="refresh"></span> 再听一次</button>
         </div>
 
         <!-- 选择题题干 -->
@@ -183,7 +189,7 @@
         </div>
 
         <div class="hint-row" id="hint-row" hidden>
-          <button class="hint-btn" id="btn-hint">💡 看提示</button>
+          <button class="hint-btn" id="btn-hint"><span data-icon="lightbulb"></span> 看提示</button>
         </div>
       </div>
 
@@ -213,7 +219,7 @@
 
       <div class="section" id="wrong-section" hidden>
         <div class="section-head">
-          <h2>📌 答错的单词</h2>
+          <h2><span class="ic-wrap" data-icon="pin"></span> 答错的单词</h2>
           <span class="section-hint">已自动加入错题本</span>
         </div>
         <div class="wrong-list" id="wrong-list"></div>
@@ -229,8 +235,8 @@
     <!-- ========== 掌握情况 ========== -->
     <section class="view view-progress" id="view-progress" hidden>
       <div class="section-head page-head">
-        <h2>📊 我的掌握情况</h2>
-        <button class="icon-btn" id="btn-close-progress">✕</button>
+        <h2><span class="ic-wrap" data-icon="chart-bar"></span> 我的掌握情况</h2>
+        <button class="icon-btn" id="btn-close-progress" aria-label="关闭"><span data-icon="close"></span></button>
       </div>
 
       <div class="mastery-summary" id="mastery-summary"></div>
@@ -258,18 +264,18 @@
     <!-- ========== 生词表 ========== -->
     <section class="view view-wordlist" id="view-wordlist" hidden>
       <div class="section-head page-head">
-        <h2>📚 生词表</h2>
-        <button class="icon-btn" id="btn-close-wordlist">✕</button>
+        <h2><span class="ic-wrap" data-icon="book-open"></span> 生词表</h2>
+        <button class="icon-btn" id="btn-close-wordlist" aria-label="关闭"><span data-icon="close"></span></button>
       </div>
-      <p class="page-note">创世记 1:1–2 (CEV) 全部 17 个重点生词 · 点击喇叭听发音</p>
+      <p class="page-note" id="wordlist-note">创世记 1:1–2 (CEV) 全部 17 个重点生词 · 点击喇叭听发音</p>
       <div class="wordlist" id="wordlist"></div>
     </section>
 
     <!-- ========== 发音训练 ========== -->
     <section class="view view-pronounce" id="view-pronounce" hidden>
       <div class="section-head page-head">
-        <h2>🎤 发音训练</h2>
-        <button class="icon-btn" id="btn-close-pronounce">✕</button>
+        <h2><span class="ic-wrap" data-icon="mic"></span> 发音训练</h2>
+        <button class="icon-btn" id="btn-close-pronounce" aria-label="关闭"><span data-icon="close"></span></button>
       </div>
 
       <div class="pron-card" id="pron-card">
@@ -278,7 +284,7 @@
             <div class="pron-word" id="pron-word">beginning</div>
             <div class="pron-ipa" id="pron-ipa"></div>
           </div>
-          <button class="round-speak" id="btn-pron-speak" aria-label="播放标准发音">🔊</button>
+          <button class="round-speak" id="btn-pron-speak" aria-label="播放标准发音"><span data-icon="speaker"></span></button>
         </div>
 
         <div class="syllables" id="pron-syllables"></div>
@@ -292,13 +298,13 @@
             <button class="btn-soft" id="btn-syllable">🎵 逐音节</button>
           </div>
           <div class="pron-tip-row" id="record-row">
-            <button class="btn-soft btn-record" id="btn-record">🎙️ 开始跟读</button>
+            <button class="btn-soft btn-record" id="btn-record"><span data-icon="mic"></span> 开始跟读</button>
             <button class="btn-soft" id="btn-playback" hidden>▶ 听我的录音</button>
           </div>
           <div class="pron-tip-row self-rate-row" id="self-rate-row">
             <span class="sr-label">跟读自评</span>
-            <button class="btn-soft sr-btn ok" id="btn-rate-ok">✅ 读准了</button>
-            <button class="btn-soft sr-btn" id="btn-rate-again">🔁 还要练</button>
+            <button class="btn-soft sr-btn ok" id="btn-rate-ok"><span data-icon="check-circle"></span> 读准了</button>
+            <button class="btn-soft sr-btn" id="btn-rate-again"><span data-icon="refresh"></span> 还要练</button>
           </div>
           <div class="record-hint" id="record-hint"></div>
         </div>
@@ -315,8 +321,8 @@
     <!-- ========== 阶段报告 ========== -->
     <section class="view view-report" id="view-report" hidden>
       <div class="section-head page-head">
-        <h2>📈 学习报告</h2>
-        <button class="icon-btn" id="btn-close-report">✕</button>
+        <h2><span class="ic-wrap" data-icon="trend-up"></span> 学习报告</h2>
+        <button class="icon-btn" id="btn-close-report" aria-label="关闭"><span data-icon="close"></span></button>
       </div>
 
       <!-- 身份卡 -->
@@ -368,8 +374,8 @@
           <span class="section-hint">发给老师汇总</span>
         </div>
         <div class="manage-row">
-          <button class="btn-secondary" id="btn-export-profile">⬇️ 下载档案</button>
-          <button class="btn-secondary" id="btn-copy-profile">📋 复制</button>
+          <button class="btn-secondary" id="btn-export-profile"><span data-icon="download"></span> 下载档案</button>
+          <button class="btn-secondary" id="btn-copy-profile"><span data-icon="copy"></span> 复制</button>
         </div>
         <p class="page-note" style="margin-top:10px">
           档案包含你的昵称、每次测试成绩、每个词的掌握情况。<br>
@@ -381,8 +387,8 @@
     <!-- ========== 教师模式 ========== -->
     <section class="view view-teacher" id="view-teacher" hidden>
       <div class="section-head page-head">
-        <h2>🎓 教师模式</h2>
-        <button class="icon-btn" id="btn-close-teacher">✕</button>
+        <h2><span class="ic-wrap" data-icon="graduation"></span> 教师模式</h2>
+        <button class="icon-btn" id="btn-close-teacher" aria-label="关闭"><span data-icon="close"></span></button>
       </div>
       <p class="page-note">导入课程材料（PDF 或粘贴文本），系统自动提取生词、查词典、按难度分层，生成词表与测试。</p>
 
@@ -390,7 +396,7 @@
       <div class="teacher-step" id="teacher-step-1">
         <div class="step-head"><span class="step-num">1</span><h3>导入课程材料</h3></div>
         <div class="drop-zone" id="drop-zone">
-          <div class="dz-icon">📄</div>
+          <div class="dz-icon" data-icon="file-text"></div>
           <p class="dz-title">把 PDF 拖到这里</p>
           <p class="dz-sub">或点击选择文件</p>
           <input type="file" id="file-pdf" accept="application/pdf,.pdf" hidden>
@@ -422,8 +428,8 @@
         <div class="step-head"><span class="step-num">3</span><h3>课程包已生成</h3></div>
         <div class="export-box" id="export-box"></div>
         <div class="teacher-actions">
-          <button class="btn-secondary" id="btn-teacher-download">⬇️ 下载 JSON</button>
-          <button class="btn-secondary" id="btn-teacher-copy">📋 复制到剪贴板</button>
+          <button class="btn-secondary" id="btn-teacher-download"><span data-icon="download"></span> 下载 JSON</button>
+          <button class="btn-secondary" id="btn-teacher-copy"><span data-icon="copy"></span> 复制到剪贴板</button>
           <button class="btn-primary" id="btn-teacher-preview">在学生端预览</button>
         </div>
         <p class="step-note">把下载的 JSON 放到仓库 <code>courses/</code> 目录，并在 <code>courses/index.json</code> 里加一行清单即可发布。</p>
@@ -467,6 +473,7 @@
 <script src="js/store.js"></script>
 <script src="js/speech.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/icons.js"></script>
 <script src="js/lexicon.js"></script>
 <script src="js/importer.js"></script>
 <script src="js/course.js"></script>

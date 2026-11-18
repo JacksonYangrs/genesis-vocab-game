@@ -9,6 +9,50 @@
   'use strict';
 
   var KEY = 'genesis-vocab-progress-v1';
+  var NAME_KEY = 'genesis-vocab-name';
+
+  /**
+   * 昵称多重备份。
+   *
+   * 为什么三重：微信内置浏览器（WKWebView）在部分场景下会清理或隔离
+   * localStorage（退出重进、长时间未访问、容器清理缓存等），
+   * 单靠 localStorage 会出现"填了昵称，下次打开又没了"，
+   * 而且完全查不出原因 —— 因为 save 本身没报错，只是数据没了。
+   *
+   * 三个存储位性质不同，存活概率互补：
+   *   localStorage   —— 持久，但可能被清
+   *   sessionStorage —— 当次会话有效
+   *   cookie         —— 持久，且与 localStorage 是不同的存储区
+   */
+  function readNameFallback() {
+    var v = '';
+    try { v = global.localStorage.getItem(NAME_KEY) || ''; } catch (e) { /* 忽略 */ }
+    if (v) return v;
+    try { v = global.sessionStorage.getItem(NAME_KEY) || ''; } catch (e) { /* 忽略 */ }
+    if (v) return v;
+    try {
+      var m = (global.document.cookie || '').match(/(?:^|;\s*)gv_name=([^;]*)/);
+      if (m) return decodeURIComponent(m[1]);
+    } catch (e) { /* 忽略 */ }
+    return '';
+  }
+
+  function writeNameFallback(name) {
+    try {
+      if (name) global.localStorage.setItem(NAME_KEY, name);
+      else global.localStorage.removeItem(NAME_KEY);
+    } catch (e) { /* 忽略 */ }
+    try {
+      if (name) global.sessionStorage.setItem(NAME_KEY, name);
+      else global.sessionStorage.removeItem(NAME_KEY);
+    } catch (e) { /* 忽略 */ }
+    try {
+      // cookie 兜底，30 天
+      global.document.cookie = name
+        ? 'gv_name=' + encodeURIComponent(name) + '; path=/; max-age=2592000; SameSite=Lax'
+        : 'gv_name=; path=/; max-age=0; SameSite=Lax';
+    } catch (e) { /* 忽略 */ }
+  }
 
   /** 五级掌握度标尺 */
   var LEVELS = {
@@ -48,10 +92,17 @@
     load: function () {
       try {
         var raw = global.localStorage.getItem(KEY);
-        if (!raw) { this.state = defaultState(); return this.state; }
+        var base = defaultState();
+        if (!raw) {
+          // 主存储没有数据 —— 但独立 key 里可能还留着昵称
+          // （主存储被清空是微信内置浏览器/无痕模式下的常见情况）
+          this.state = defaultState();
+          var fb0 = readNameFallback();
+          if (fb0) this.state.identity.name = fb0;
+          return this.state;
+        }
         var parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') throw new Error('bad shape');
-        var base = defaultState();
         // 逐字段合并，防止旧版本缺字段导致崩溃
         this.state = {
           version: parsed.version || 1,
@@ -61,8 +112,17 @@
           history: Array.isArray(parsed.history) ? parsed.history.slice(-50) : [],
           createdAt: parsed.createdAt || Date.now()
         };
+
+        // 昵称回退：主存储里没有但独立 key 里有，说明主存储曾被清空过
+        if (!this.state.identity.name) {
+          var fb = readNameFallback();
+          if (fb) this.state.identity.name = fb;
+        }
       } catch (e) {
         this.state = defaultState();
+        // 解析失败也要回退昵称
+        var fb2 = readNameFallback();
+        if (fb2) this.state.identity.name = fb2;
       }
       return this.state;
     },
@@ -72,8 +132,29 @@
         global.localStorage.setItem(KEY, JSON.stringify(this.state));
         return true;
       } catch (e) {
+        // 不再静默失败 —— 存储不可用时（微信内置浏览器限制、无痕模式、
+        // 配额满）要让用户知道，否则会出现"填了昵称但下次打开没了"
+        // 这种查不出原因的问题。
+        this.lastSaveError = e && e.name ? e.name : 'unknown';
+        if (this.onSaveError) {
+          try { this.onSaveError(this.lastSaveError); } catch (e2) { /* 忽略 */ }
+        }
         return false;
       }
+    },
+
+    /** 存储是否可用（首次调用会实际探测一次） */
+    storageAvailable: function () {
+      if (this._storageOk !== undefined) return this._storageOk;
+      try {
+        var probe = '__gv_probe__';
+        global.localStorage.setItem(probe, '1');
+        global.localStorage.removeItem(probe);
+        this._storageOk = true;
+      } catch (e) {
+        this._storageOk = false;
+      }
+      return this._storageOk;
     },
 
     /** 取（并初始化）某个词的成绩档案 */
@@ -99,6 +180,8 @@
 
     /** 记一次答题结果 */
     record: function (wordId, isCorrect) {
+      // 顺手同步一次昵称备份 —— 万一主存储写失败，独立 key 还能留住
+      writeNameFallback(this.state.identity && this.state.identity.name);
       var r = this.recordOf(wordId);
       r.seen += 1;
       if (isCorrect) {
@@ -182,7 +265,9 @@
       this.state.identity = this.state.identity || { name: '', joinedAt: 0 };
       this.state.identity.name = n;
       if (!this.state.identity.joinedAt) this.state.identity.joinedAt = Date.now();
+      // 双写：主存储 + 独立 key（localStorage / sessionStorage / cookie）
       this.save();
+      writeNameFallback(n);
       return n;
     },
 
@@ -339,6 +424,7 @@
     /** 清空全部进度（需二次确认，UI 层负责） */
     reset: function () {
       this.state = defaultState();
+      writeNameFallback('');
       this.save();
     },
 
@@ -363,9 +449,13 @@
         version: incoming.version || 1,
         words: incoming.words || {},
         settings: Object.assign({}, base.settings, incoming.settings || {}),
+        // 导入进度时要保留身份 —— 否则导入后昵称被清空，
+        // 用户会以为"存的记录丢了名字"。
+        identity: Object.assign({}, base.identity, incoming.identity || {}),
         history: Array.isArray(incoming.history) ? incoming.history.slice(-50) : [],
         createdAt: incoming.createdAt || Date.now()
       };
+      writeNameFallback(this.state.identity.name);
       this.save();
       return true;
     }

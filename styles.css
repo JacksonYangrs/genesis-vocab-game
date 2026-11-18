@@ -1739,3 +1739,113 @@ h1, h2, h3, p { margin: 0; }
 .nb-text { font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
 .name-bar.done .nb-text { color: var(--text); font-weight: 500; }
 .nb-btn { flex-shrink: 0; padding: 6px 13px; font-size: 12.5px; }
+
+/* ==========================================================
+   统一 SVG 图标
+   全部图标走同一套规格：24 视框、1.7px 描边、currentColor 着色
+   ========================================================== */
+
+.ic {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: -0.14em;
+  flex-shrink: 0;
+}
+
+/* 图标包裹层：负责尺寸与对齐 */
+.ic-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.14em;
+}
+.ic-wrap .ic { width: 1.15em; height: 1.15em; }
+
+/* 顶栏按钮 */
+.icon-btn svg,
+.icon-btn .ic-wrap .ic { width: 19px; height: 19px; }
+.icon-btn .ic-wrap { width: 19px; height: 19px; }
+
+/* 品牌图标 */
+.brand-mark svg { width: 20px; height: 20px; display: block; }
+
+/* 章节标题 */
+h2 .ic-wrap {
+  width: 1.05em;
+  height: 1.05em;
+  color: var(--primary);
+  margin-right: 2px;
+}
+h2 .ic-wrap .ic { width: 1.05em; height: 1.05em; }
+
+/* 按钮里的图标 */
+.btn-secondary .ic-wrap,
+.btn-primary .ic-wrap,
+.btn-soft .ic-wrap,
+.hint-btn .ic-wrap,
+.replay-btn .ic-wrap,
+.chip .ic-wrap { margin-right: 6px; }
+.btn-secondary .ic-wrap .ic,
+.btn-primary .ic-wrap .ic,
+.btn-soft .ic-wrap .ic,
+.hint-btn .ic-wrap .ic,
+.replay-btn .ic-wrap .ic,
+.chip .ic-wrap .ic { width: 1.05em; height: 1.05em; }
+
+/* 专项练习卡片 */
+.special-icon { color: var(--primary); }
+.special-icon .ic { width: 22px; height: 22px; }
+
+/* 喇叭 */
+.speaker-icon .ic { width: 26px; height: 26px; }
+.round-speak .ic { width: 21px; height: 21px; }
+.wl-speak .ic { width: 16px; height: 16px; }
+
+/* 拖拽区文件图标 */
+.dz-icon { color: var(--text-3); }
+.dz-icon .ic { width: 32px; height: 32px; }
+
+/* 关闭按钮 */
+.back-btn svg,
+.back-btn .ic-wrap .ic { width: 15px; height: 15px; }
+.back-btn .ic-wrap { width: 15px; height: 15px; }
+
+/* 反馈/提示区 */
+.fb-note .ic-wrap,
+.fb-nearmiss .ic-wrap,
+.wrong-note .ic-wrap { margin-right: 5px; vertical-align: -0.16em; }
+.fb-note .ic-wrap .ic,
+.fb-nearmiss .ic-wrap .ic,
+.wrong-note .ic-wrap .ic { width: 1em; height: 1em; }
+
+/* 连对提示条 */
+.combo-flag .ic-wrap { margin-right: 5px; }
+.combo-flag .ic-wrap .ic { width: 1.05em; height: 1.05em; }
+
+/* 掌握度行内的跟读统计 */
+.m-word small .ic-wrap { margin-right: 3px; vertical-align: -0.16em; }
+.m-word small .ic-wrap .ic { width: 0.95em; height: 0.95em; }
+
+/* ---------- 存储不可用警告 ---------- */
+
+.storage-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 14px;
+  background: var(--danger-soft);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-s);
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.storage-warn .ic-wrap {
+  color: var(--danger);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.storage-warn .ic-wrap .ic { width: 1.05em; height: 1.05em; }

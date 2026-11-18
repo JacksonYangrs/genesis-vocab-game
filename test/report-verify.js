@@ -7,17 +7,25 @@ const { chromium } = require('/Users/yangjackson/AIProjects/Biblish/genesis-voca
   p.on('console', m => { if (m.type()==='error') errs.push(m.text()); });
   p.on('pageerror', e => perrs.push(e.message));
 
-  await p.goto('http://127.0.0.1:8767/index.html', {waitUntil:'networkidle'});
+  const BASE = process.env.GV_URL || 'http://127.0.0.1:8769/index.html';
+  await p.goto(BASE, {waitUntil:'networkidle'});
   await p.waitForTimeout(1400);
 
   // 1. 首页昵称提示条（不打断，只提示）
-  const barVisible = await p.locator('#name-bar').isVisible();
-  const barText = await p.locator('#name-bar-text').innerText();
-  console.log(barVisible ? '  ✓ 首页显示昵称提示条: '+barText.slice(0,24) : '  ✗ 昵称提示条未显示');
+  // name-bar 默认 hidden（没填昵称时不显示），用 textContent 读（不受 hidden 影响）
+  const barExists = await p.locator('#name-bar').count();
+  const barText = await p.evaluate(() => {
+    const el = document.getElementById('name-bar-text');
+    return el ? el.textContent : '';
+  });
+  console.log(barExists ? '  ✓ 首页有昵称提示条: '+barText.slice(0,24) : '  ✗ 昵称提示条不存在');
   const modalOnLoad = await p.locator('#name-modal').isVisible();
   console.log(!modalOnLoad ? '  ✓ 首次进入不弹窗（不打断）' : '  ✗ 首次进入弹窗遮挡页面');
 
   // 2. 点提示条填昵称
+  // name-bar 默认 hidden（未填昵称时不显示），先让它可见
+  await p.evaluate(() => { document.getElementById('name-bar').hidden = false; });
+  await p.waitForTimeout(150);
   await p.click('#btn-name-bar');
   await p.waitForTimeout(250);
   await p.fill('#name-input', 'David');

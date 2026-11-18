@@ -96,6 +96,51 @@ def quantile(values, q):
     return s[lo] + (s[hi] - s[lo]) * (pos - lo)
 
 
+def to_ipa(raw):
+    """ECDICT 音标 → 标准 IPA（保守版）
+
+    与 js/lexicon.js 的 toIPA() 保持一致。
+
+    原则：不猜。
+    ECDICT 音标是混合体 —— 准 IPA（ˈdʒɛnəsɪs）与老式 ASCII（'bi'giniŋ）混用。
+    老式里的 `i` 是 /ɪ/，准 IPA 里的 `i` 是 /i/（happy vowel），
+    光看字符无法区分，所以只做绝对安全的符号规范化，
+    元音层面的偏差靠 PHONETIC_OVERRIDE 覆盖。
+    """
+    if not raw:
+        return ""
+    t = str(raw).strip().strip("/").strip("'")
+    if not t:
+        return ""
+    fixes = [
+        (r":+", "ː"),
+        (r"'", "ˈ"),
+        (r"ɡ", "ɡ"),
+        (r"ә", "ə"),
+        (r"ɛi", "eɪ"),
+        (r"ɛə", "eə"),
+        (r"ɑi", "aɪ"),
+        (r"ɔu", "əʊ"),
+        (r"ːː+", "ː"),
+        # ECDICT 老式音标里确定的错写组合，安全修正
+        (r"ei", "eɪ"), (r"ai", "eɪ"), (r"ay", "eɪ"),
+        (r"əu", "əʊ"),
+        (r"ee", "iː"), (r"ea", "iː"), (r"oo", "uː"),
+        (r"ou", "aʊ"), (r"ow", "aʊ"),
+        (r"oi", "ɔɪ"), (r"oy", "ɔɪ"),
+        (r"ch", "tʃ"), (r"sh", "ʃ"), (r"th", "θ"),
+        (r"ng", "ŋ"),
+        (r"g", "ɡ"),
+    ]
+    for pat, rep in fixes:
+        t = re.sub(pat, rep, t)
+    # 只保留 IPA 合法字符
+    # 注意：ɡ（U+0261，IPA 的 g）必须在列表里，
+    # 否则上面刚做的 g→ɡ 归一会把它当非法字符删掉
+    t = re.sub(r"[^a-zɑɒɔɛɪʊʌæɜəɚʃʒŋθðɡˈˌː().·\-\s]", "", t, flags=re.I)
+    return "/" + t.strip() + "/"
+
+
 def short_meaning(raw):
     """精简释义：取一个义项，控制在 12 字以内。
 
@@ -108,7 +153,7 @@ def short_meaning(raw):
     if not raw:
         return ""
     s = raw.strip()
-    items = [x.strip() for x in s.split(";") if x.strip()]
+    items = [x.strip() for x in re.split(r"[;；]", s) if x.strip()]
     if not items:
         return s
 
@@ -138,6 +183,91 @@ def short_meaning(raw):
     return first
 
 
+# 圣经专有名词标准译法表
+#
+# 问题：ECDICT 是通用英汉词典，genesis 给的是「发生, 起源, 创世记」，
+# 但圣经学习场景要的是「创世记」；exodus 给「大批的离去」而非「出埃及记」。
+# 这里补一份圣经场景的专名标准译法，优先级高于通用义项。
+# 与 js/lexicon.js 的 BIBLE_TERMS 保持一致。
+BIBLE_TERMS = {
+    # 旧约 39 卷
+    "genesis": "创世记", "exodus": "出埃及记", "leviticus": "利未记",
+    "numbers": "民数记", "deuteronomy": "申命记", "joshua": "约书亚记",
+    "judges": "士师记", "ruth": "路得记", "samuel": "撒母耳记上",
+    "kings": "列王纪上", "chronicles": "历代志上", "ezra": "以斯拉记",
+    "nehemiah": "尼希米记", "esther": "以斯帖记", "job": "约伯记",
+    "psalms": "诗篇", "psalm": "诗篇", "proverbs": "箴言", "ecclesiastes": "传道书",
+    "song": "雅歌", "songofsolomon": "雅歌", "isaiah": "以赛亚书",
+    "jeremiah": "耶利米书", "lamentations": "耶利米哀歌", "ezekiel": "以西结书",
+    "daniel": "但以理书", "hosea": "何西阿书", "joel": "约珥书",
+    "amos": "阿摩司书", "obadiah": "俄巴底亚书", "jonah": "约拿书",
+    "micah": "弥迦书", "nahum": "那鸿书", "habakkuk": "哈巴谷书",
+    "zephaniah": "西番雅书", "haggai": "哈该书", "zechariah": "撒迦利亚书",
+    "malachi": "玛拉基书",
+    # 新约 27 卷
+    "matthew": "马太福音", "mark": "马可福音", "luke": "路加福音",
+    "john": "约翰福音", "acts": "使徒行传", "romans": "罗马书",
+    "corinthians": "哥林多前书", "galatians": "加拉太书", "ephesians": "以弗所书",
+    "philippians": "腓立比书", "colossians": "歌罗西书", "thessalonians": "帖撒罗尼迦前书",
+    "timothy": "提摩太前书", "titus": "提多书", "philemon": "腓利门书",
+    "hebrews": "希伯来书", "james": "雅各书", "peter": "彼得前书",
+    "johns": "约翰一书", "jude": "犹大书", "revelation": "启示录",
+    # 常见圣经专名
+    "adam": "亚当", "eve": "夏娃", "noah": "挪亚", "abraham": "亚伯拉罕",
+    "abram": "亚伯兰", "isaac": "以撒", "jacob": "雅各", "israel": "以色列",
+    "moses": "摩西", "aaron": "亚伦", "caleb": "迦勒", "samson": "参孙",
+    "delilah": "黛莉拉", "david": "大卫", "solomon": "所罗门",
+    "elijah": "以利亚", "elisha": "以利沙", "zelbabel": "别西八",
+    "mordecai": "末底改", "joseph": "约瑟", "pharaoh": "法老",
+    "angel": "天使", "angels": "天使", "spirit": "灵", "gospel": "福音",
+    "apostle": "使徒", "apostles": "使徒", "church": "教会",
+    "christ": "基督", "jesus": "耶稣", "messiah": "弥赛亚",
+    "savior": "救主", "lord": "主", "god": "上帝",
+    "sin": "罪", "grace": "恩典", "faith": "信心", "hope": "希望",
+    "love": "爱", "prayer": "祷告", "baptism": "洗礼", "communion": "圣餐",
+    "resurrection": "复活", "salvation": "救恩", "redemption": "救赎",
+    "covenant": "约", "temple": "圣殿", "altar": "祭坛", "sacrifice": "献祭",
+    "tabernacle": "会幕", "ark": "约柜", "prophecy": "预言", "prophets": "先知",
+    "parable": "比喻", "miracle": "神迹", "miracles": "神迹",
+    "disciple": "门徒", "disciples": "门徒", "worship": "敬拜",
+    "fast": "禁食", "festival": "节期", "passover": "逾越节",
+    "pentecost": "五旬节", "sabbath": "安息日", "sinai": "西奈山",
+    "zion": "锡安", "jerusalem": "耶路撒冷", "jericho": "耶利哥",
+    "babylon": "巴比伦", "egypt": "埃及", "canaan": "迦南",
+    "gilead": "基列", "jordan": "约旦河", "galilee": "加利利",
+    "bethlehem": "伯利恒", "nazareth": "拿撒勒", "damascus": "大马士革",
+    "rome": "罗马", "athens": "雅典",
+}
+
+# 音标人工校准表（已核对过的标准音标，优先于 ECDICT）
+# 与 js/lexicon.js 的 PHONETIC_OVERRIDE 保持一致。
+PHONETIC_OVERRIDE = {
+    "genesis": "/ˈdʒɛnəsɪs/",
+    "exodus": "/ˈɛksədəs/",
+    "leviticus": "/ləˈvɪtɪkəs/",
+    "numbers": "/ˈnʌmbərz/",
+    "deuteronomy": "/ˌduːtəˈrɑːnəmi/",
+    "separated": "/ˈsɛpəreɪtɪd/",
+    # 创世记课程里已核对的词（ECDICT 的老式音标元音不准）
+    "beginning": "/bɪˈɡɪnɪŋ/",
+    "created": "/krɪˈeɪtɪd/",
+    "roaring": "/ˈrɔːɪŋ/",
+    "heavens": "/ˈhɛvənz/",
+    "heaven": "/ˈhɛvən/",
+    "barren": "/ˈbærən/",
+    "darkness": "/ˈdɑːknəs/",
+    "moving": "/ˈmuːvɪŋ/",
+    "ocean": "/ˈəʊʃən/",
+    "spirit": "/ˈspɪrɪt/",
+    "create": "/kriˈeɪt/",
+    "life": "/laɪf/",
+    "earth": "/ɜːθ/",
+    "form": "/fɔːm/",
+    "move": "/muːv/",
+    "water": "/ˈwɔːtə/",
+    "god": "/ɡɒd/",
+}
+
 # 人工校准：ECDICT 缺义项或义项不匹配教学场景的词
 # （moving 只有"动人的"没有"移动的"；heavens 的义项格式特殊）
 MEANING_OVERRIDE = {
@@ -158,6 +288,21 @@ MEANING_OVERRIDE = {
     "water":    "水",
     "move":     "移动, 运动",
     "create":   "创造, 创作",
+    # 圣经语境的常用词（通用义项在此处不准确或太长）
+    "separated": "分开的, 分离的",
+    "light":    "光, 光亮",
+    "day":      "日, 白天",
+    "night":    "夜, 夜晚",
+    "morning":  "早晨, 清晨",
+    "evening":  "傍晚, 夜晚",
+    "called":   "称为, 呼召",
+    "saw":      "看见, 察觉",
+    "said":     "说, 讲",
+    "made":     "造, 制作",
+    "gave":     "给, 赐",
+    "land":     "土地, 陆地",
+    "famine":   "饥荒",
+    "covered":  "覆盖, 遮盖",
 }
 
 
@@ -258,8 +403,9 @@ def main():
                 if len(cn) >= 3:
                     break
                 ow = other["word"]
-                m = MEANING_OVERRIDE.get(ow, short_meaning(other["info"]["c"]))
-                if m != MEANING_OVERRIDE.get(w, short_meaning(item["info"]["c"])) and m not in cn:
+                m = BIBLE_TERMS.get(ow) or MEANING_OVERRIDE.get(ow, short_meaning(other["info"]["c"]))
+                mine = BIBLE_TERMS.get(w) or MEANING_OVERRIDE.get(w, short_meaning(item["info"]["c"]))
+                if m != mine and m not in cn:
                     cn.append(m)
 
             example = ""
@@ -273,8 +419,8 @@ def main():
             words.append({
                 "id": "w_" + w,
                 "word": w,
-                "phonetic": item["info"]["p"],
-                "meaning": MEANING_OVERRIDE.get(w, short_meaning(item["info"]["c"])),
+                "phonetic": PHONETIC_OVERRIDE.get(w) or to_ipa(item["info"]["p"]),
+                "meaning": BIBLE_TERMS.get(w) or MEANING_OVERRIDE.get(w, short_meaning(item["info"]["c"])),
                 "fullMeaning": item["info"]["c"],
                 "pos": item["info"]["t"],
                 "level": lv,
