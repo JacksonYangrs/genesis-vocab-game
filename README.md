@@ -6,7 +6,7 @@
 
 https://jacksonyangrs.github.io/genesis-vocab-game/
 
-当前版本：**v2.1.0**（2026-11-19）。版本以 `package.json` 的 `version` 与
+当前版本：**v2.1.1**（2026-11-19）。版本以 `package.json` 的 `version` 与
 `index.html` 的 `<meta name="app-version">` 为准，两者必须与线上一致。
 
 手机、平板、电脑打开即用，无需注册。每个人的学习进度保存在各自浏览器中，互不影响。

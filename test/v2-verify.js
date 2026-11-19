@@ -350,6 +350,55 @@ Students should learn these difficult words. Read the passage and discuss the me
   });
   log('刷新后激活课程仍可正常取词', activeWords > 0, activeWords + ' 词');
 
+  console.log('\n【6.6】删除课程');
+  const beforeDelete = await page.locator('.course-card').count();
+  const delInfo = await page.evaluate(() => {
+    const id = window.Course.activeId;
+    const m = window.Course.library.filter(c => c.id === id)[0];
+    return {
+      id: id,
+      data: m && m._data ? m._data : null,
+      historyLen: window.Store.state.history.length
+    };
+  });
+  await page.locator('.course-card').first().locator('.c-del').click();
+  await page.waitForTimeout(150);
+  log('删除前弹确认框防误删', await page.locator('#modal:not([hidden])').count() === 1);
+  await page.click('#modal-confirm');
+  await page.waitForTimeout(300);
+  const afterDelete = await page.locator('.course-card').count();
+  log('课程可删除', afterDelete === beforeDelete - 1, beforeDelete + ' → ' + afterDelete);
+  const deletedMap = await page.evaluate(() => JSON.parse(localStorage.getItem('gv_deleted_courses_v1') || '{}'));
+  log('删除清单持久化', !!deletedMap[delInfo.id], Object.keys(deletedMap).join(', '));
+  const afterDeleteState = await page.evaluate(() => ({
+    history: window.Store.state.history.length,
+    active: window.Course.activeId,
+    lib: window.Course.library.map(c => c.id)
+  }));
+  log('学习进度保留', afterDeleteState.history === delInfo.historyLen,
+    delInfo.historyLen + ' → ' + afterDeleteState.history + ' 条记录');
+  log('删除当前课后自动切换激活课',
+    afterDeleteState.active !== delInfo.id && afterDeleteState.lib.indexOf(afterDeleteState.active) >= 0,
+    afterDeleteState.active);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  const afterDelReload = await page.locator('.course-card').count();
+  log('刷新后已删课程不复活', afterDelReload === afterDelete, afterDelReload + ' 个课程');
+
+  if (delInfo.data) {
+    // 重新导入同 id：删除标记要撤销，刷新后课程回来，历史进度仍在
+    await page.evaluate((d) => window.Course.importCourse(d), delInfo.data);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(900);
+    const afterReimport = await page.locator('.course-card').count();
+    log('重新导入同 id 课程可恢复', afterReimport === afterDelete + 1,
+      afterDelete + ' → ' + afterReimport + ' 个课程');
+    const deletedAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('gv_deleted_courses_v1') || '{}'));
+    log('重新导入撤销删除标记', !deletedAfter[delInfo.id]);
+    const histAfter = await page.evaluate(() => window.Store.state.history.length);
+    log('重新导入后历史进度仍在', histAfter === delInfo.historyLen, histAfter + ' 条记录');
+  }
+
   console.log('\n【7】控制台检查');
   log('无页面异常', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
   log('无 console 错误', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));

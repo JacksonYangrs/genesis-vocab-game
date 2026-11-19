@@ -154,22 +154,54 @@
     }
 
     lib.forEach(function (c) {
-      var btn = document.createElement('button');
-      btn.className = 'course-card' + (c.id === window.Course.activeId ? ' active' : '');
-      btn.setAttribute('data-course', c.id);
+      // 卡片改成 div 容器：<button> 里不能再嵌删除按钮（HTML 非法），
+      // 所以选课与删除各用一个按钮，并排放在容器里。
+      var card = document.createElement('div');
+      card.className = 'course-card' + (c.id === window.Course.activeId ? ' active' : '');
+      card.setAttribute('data-course', c.id);
+
       var total = c.levelCounts ? (c.levelCounts[0] + c.levelCounts[1] + c.levelCounts[2]) : c.wordCount;
-      btn.innerHTML =
+
+      var main = document.createElement('button');
+      main.type = 'button';
+      main.className = 'c-main';
+      main.innerHTML =
         '<span class="c-title">' + esc(c.title) + '</span>' +
         (c.subtitle ? '<span class="c-sub">' + esc(c.subtitle) + '</span>' : '') +
         '<span class="c-meta">共 ' + total + ' 词 · 入门 ' +
         (c.levelCounts ? c.levelCounts[0] : 0) + ' / 进阶 ' +
         (c.levelCounts ? c.levelCounts[1] : 0) + ' / 挑战 ' +
         (c.levelCounts ? c.levelCounts[2] : 0) + '</span>';
-      btn.addEventListener('click', function () { selectCourse(c.id); });
-      box.appendChild(btn);
+      main.addEventListener('click', function () { selectCourse(c.id); });
+
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'c-del';
+      del.textContent = '×';
+      del.title = '删除课程';
+      del.setAttribute('aria-label', '删除《' + c.title + '》');
+      del.addEventListener('click', function () { confirmDeleteCourse(c); });
+
+      card.appendChild(main);
+      card.appendChild(del);
+      box.appendChild(card);
     });
 
     els.courseHint.textContent = lib.length + ' 个课程';
+  }
+
+  /** 删除课程：先确认防误删；学习进度保留不动 */
+  function confirmDeleteCourse(c) {
+    confirmDialog('删除课程？',
+      '《' + c.title + '》将从课程列表移除。学习进度会保留，重新导入同名课程后仍在。',
+      '删除').then(function (ok) {
+        if (!ok) return;
+        var r = window.Course.deleteCourse(c.id);
+        renderHome();
+        toast(r.persisted
+          ? '已删除《' + c.title + '》'
+          : '已删除《' + c.title + '》（本地存储不可用，刷新后可能恢复）');
+      });
   }
 
   /** 水平选择卡片 */

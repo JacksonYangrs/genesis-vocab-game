@@ -40,6 +40,9 @@
   // 只存课程包本体（体积约 2-8 KB/课），不存 library 数组，避免与远端清单打架。
   var LOCAL_KEY = 'gv_local_courses_v1';
   var ACTIVE_KEY = 'gv_active_course_v1';
+  // 已删除课程 id 清单。内置课每次启动都会从 courses/index.json 读回来，
+  // 不记这个清单的话删了刷新就复活。
+  var DELETED_KEY = 'gv_deleted_courses_v1';
 
   function readLocalStore() {
     try {
@@ -60,6 +63,19 @@
 
   function writeActive(id) {
     try { global.localStorage.setItem(ACTIVE_KEY, id); } catch (e) { /* 忽略 */ }
+  }
+
+  function readDeleted() {
+    try {
+      var raw = global.localStorage.getItem(DELETED_KEY);
+      var obj = raw ? JSON.parse(raw) : {};
+      return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (e) { return {}; }
+  }
+
+  function writeDeleted(map) {
+    try { global.localStorage.setItem(DELETED_KEY, JSON.stringify(map)); return true; }
+    catch (e) { return false; }
   }
 
   /** 课程包 → 课程库 meta（本地包数据已在内存，不需要 fetch） */
@@ -100,12 +116,18 @@
      */
     loadLibrary: function () {
       var self = this;
-      // 先把上一次导入、已写进 localStorage 的课程恢复回来；
+      var deleted = readDeleted();
+      // 先把已删除的从内存里清掉 —— init() 每次都会重新注入内置兜底课程，
+      // 不先清的话被删的课会在首屏闪一下，fetch 失败时更会一直留着。
+      this.library = this.library.filter(function (c) { return !deleted[c.id]; });
+
+      // 再把上一次导入、已写进 localStorage 的课程恢复回来；
       // 没这一步，刷新后 init() 只重建内置课程，用户导入的课就"消失"了。
       var stored = readLocalStore();
       Object.keys(stored).forEach(function (id) {
         var d = stored[id];
         if (!d || !d.words || !Array.isArray(d.words)) return;
+        if (deleted[id]) return;
         if (self.library.some(function (c) { return c.id === d.id; })) return;
         self.library.unshift(localMeta(d));
       });
@@ -139,7 +161,8 @@
           var ids = {};
           remote.forEach(function (c) { ids[c.id] = true; });
           var kept = localCourses.filter(function (c) { return !ids[c.id]; });
-          self.library = kept.concat(remote);
+          // 远端清单里的内置课也会被带回来，统一按删除清单过滤，刷新不复活
+          self.library = kept.concat(remote).filter(function (c) { return !deleted[c.id]; });
           // 刷新后仍高亮用户上次选的那门课；没记录过才退回清单第一门
           var saved = readActive();
           self.activeId = (saved && self.library.some(function (c) { return c.id === saved; }))
@@ -232,7 +255,7 @@
     },
 
     /**
-     * 导入课程包（教师「在学生端预览」/ 学生「导入课程包 JSON」共用）
+     * 导入课程包（教师模式生成课程时调用）
      * 与 saveLocal 的区别：写进 localStorage，刷新后课程和选中状态都还在。
      * 返回 { meta, persisted }；persisted=false 表示浏览器不给存，本次可用但刷新会丢。
      */
@@ -241,8 +264,36 @@
       var map = readLocalStore();
       map[data.id] = data;
       var persisted = writeLocalStore(map);
+      // 重新导入同 id 的课程要撤销删除标记，否则刷新后又被 loadLibrary 过滤掉
+      var deleted = readDeleted();
+      if (deleted[data.id]) { delete deleted[data.id]; writeDeleted(deleted); }
       if (persisted) writeActive(data.id);
       return { meta: meta, persisted: persisted };
+    },
+
+    /**
+     * 删除课程（内置课与教师导入课都能删）
+     * 三件事一起做：从内存课程库移除、从本地课程包里移除、记进删除清单，
+     * 这样内置课刷新后不会从 courses/index.json 复活。
+     * 学习进度不在这里动 —— Store 的历史按 courseId 留档，重新导入同名课程后还在。
+     * 返回 { persisted, activeId }。
+     */
+    deleteCourse: function (id) {
+      this.library = this.library.filter(function (c) { return c.id !== id; });
+
+      var map = readLocalStore();
+      delete map[id];
+      writeLocalStore(map);
+
+      var deleted = readDeleted();
+      deleted[id] = Date.now();
+      var persisted = writeDeleted(deleted);
+
+      // 删的是当前课 → 自动切到剩下第一门，避免 activeId 指向不存在的课程
+      if (this.activeId === id) {
+        this.setActive(this.library.length ? this.library[0].id : '');
+      }
+      return { persisted: persisted, activeId: this.activeId };
     },
 
     /** 记住当前选中的课程，刷新后仍高亮同一门 */
