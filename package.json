@@ -1,4 +1,8 @@
 {
+  "name": "genesis-vocab-game",
+  "version": "2.1.0",
+  "private": true,
+  "description": "创世记词汇挑战互动游戏：教师端导入课程，学生端测试",
   "dependencies": {
     "playwright-core": "^1.49.1"
   }
