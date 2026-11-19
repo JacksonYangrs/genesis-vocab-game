@@ -36,6 +36,50 @@
 (function (global) {
   'use strict';
 
+  // 本地导入的课程包 / 当前选中课程都存 localStorage。
+  // 只存课程包本体（体积约 2-8 KB/课），不存 library 数组，避免与远端清单打架。
+  var LOCAL_KEY = 'gv_local_courses_v1';
+  var ACTIVE_KEY = 'gv_active_course_v1';
+
+  function readLocalStore() {
+    try {
+      var raw = global.localStorage.getItem(LOCAL_KEY);
+      var obj = raw ? JSON.parse(raw) : {};
+      return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (e) { return {}; }
+  }
+
+  function writeLocalStore(map) {
+    try { global.localStorage.setItem(LOCAL_KEY, JSON.stringify(map)); return true; }
+    catch (e) { return false; }
+  }
+
+  function readActive() {
+    try { return global.localStorage.getItem(ACTIVE_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function writeActive(id) {
+    try { global.localStorage.setItem(ACTIVE_KEY, id); } catch (e) { /* 忽略 */ }
+  }
+
+  /** 课程包 → 课程库 meta（本地包数据已在内存，不需要 fetch） */
+  function localMeta(data) {
+    return {
+      id: data.id,
+      title: data.title || data.id,
+      subtitle: data.subtitle || '',
+      reference: data.reference || '',
+      quote: data.quote || '',
+      quoteEn: data.quoteEn || '',
+      wordCount: data.words.length,
+      levelCounts: countLevels(data.words),
+      file: 'local-' + data.id + '.json',
+      _loaded: true,
+      _data: data,
+      _local: true
+    };
+  }
+
   var LEVELS = [
     { key: 0, label: '入门', desc: '基础词，多已认识' },
     { key: 1, label: '进阶', desc: '中等难度' },
@@ -56,7 +100,17 @@
      */
     loadLibrary: function () {
       var self = this;
-      // 先记住本地课程，loadLibrary 会重建数组
+      // 先把上一次导入、已写进 localStorage 的课程恢复回来；
+      // 没这一步，刷新后 init() 只重建内置课程，用户导入的课就"消失"了。
+      var stored = readLocalStore();
+      Object.keys(stored).forEach(function (id) {
+        var d = stored[id];
+        if (!d || !d.words || !Array.isArray(d.words)) return;
+        if (self.library.some(function (c) { return c.id === d.id; })) return;
+        self.library.unshift(localMeta(d));
+      });
+
+      // 再记住本地课程，loadLibrary 会重建数组
       var localCourses = this.library.filter(function (c) { return c._local; });
 
       return fetch('courses/index.json')
@@ -86,7 +140,11 @@
           remote.forEach(function (c) { ids[c.id] = true; });
           var kept = localCourses.filter(function (c) { return !ids[c.id]; });
           self.library = kept.concat(remote);
-          self.activeId = self.library.length ? self.library[0].id : null;
+          // 刷新后仍高亮用户上次选的那门课；没记录过才退回清单第一门
+          var saved = readActive();
+          self.activeId = (saved && self.library.some(function (c) { return c.id === saved; }))
+            ? saved
+            : (self.library.length ? self.library[0].id : null);
 
           // 立刻加载首个课程的完整数据
           if (!self.activeId) return self.library;
@@ -162,22 +220,9 @@
       return limit ? list.slice(0, limit) : list;
     },
 
-    /** 保存老师生成的课程包到本地（老师本地预览用） */
+    /** 把课程放进内存课程库（首屏内置兜底也走这里，不落盘） */
     saveLocal: function (data) {
-      var meta = {
-        id: data.id,
-        title: data.title,
-        subtitle: data.subtitle || '',
-        reference: data.reference || '',
-        quote: data.quote || '',
-        quoteEn: data.quoteEn || '',
-        wordCount: data.words.length,
-        levelCounts: countLevels(data.words),
-        file: 'local-' + data.id + '.json',
-        _loaded: true,
-        _data: data,
-        _local: true
-      };
+      var meta = localMeta(data);
       // 替换同 id 的
       var i = this.library.findIndex(function (c) { return c.id === data.id; });
       if (i >= 0) this.library[i] = meta;
@@ -186,13 +231,33 @@
       return meta;
     },
 
+    /**
+     * 导入课程包（教师「在学生端预览」/ 学生「导入课程包 JSON」共用）
+     * 与 saveLocal 的区别：写进 localStorage，刷新后课程和选中状态都还在。
+     * 返回 { meta, persisted }；persisted=false 表示浏览器不给存，本次可用但刷新会丢。
+     */
+    importCourse: function (data) {
+      var meta = this.saveLocal(data);
+      var map = readLocalStore();
+      map[data.id] = data;
+      var persisted = writeLocalStore(map);
+      if (persisted) writeActive(data.id);
+      return { meta: meta, persisted: persisted };
+    },
+
+    /** 记住当前选中的课程，刷新后仍高亮同一门 */
+    setActive: function (id) {
+      this.activeId = id;
+      writeActive(id);
+    },
+
     /** 导出为可下载的 JSON 文本 */
     exportJson: function (data) {
       return JSON.stringify(data, null, 2);
     },
 
     /**
-     * 导入课程包（老师加载自己保存的 JSON）
+     * 导入课程包（解析老师保存的 JSON 文本）
      */
     importJson: function (text) {
       var data = JSON.parse(text);
@@ -200,6 +265,9 @@
         throw new Error('不是有效的课程包：缺少 words 字段');
       }
       if (!data.id) data.id = 'imported-' + Date.now();
+      if (!data.title) data.title = '导入的课程';
+      // 第三方课程包可能没带句子素材，sentencesAtLevel 会直接读 .length
+      if (!Array.isArray(data.sentences)) data.sentences = [];
       return data;
     }
   };

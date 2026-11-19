@@ -257,7 +257,26 @@ Students should learn these difficult words. Read the passage and discuss the me
   await page.waitForSelector('#view-home:not([hidden])');
   await page.waitForTimeout(500);
   const newCourseCards = await page.locator('.course-card').count();
-  log('新课程进入学生端', newCourseCards >= 1, newCourseCards + ' 个课程');
+  const firstCard = await page.locator('.course-card').first().innerText();
+  const activeCard = await page.locator('.course-card.active').first().innerText();
+  // 以前这里写 >= 1，初始本来就 1 门课，恒真 —— 测不出「新课程没出现」
+  log('新课程进入学生端', newCourseCards === courseCards + 1,
+    courseCards + ' → ' + newCourseCards + ' 个课程');
+  log('新课程排在首位且高亮',
+    /Genesis 1:1-2 \(CEV\)/.test(firstCard) && activeCard === firstCard,
+    firstCard.split('\n')[0]);
+
+  // 刷新后课程与选中状态都还在（localStorage 持久化）
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  const afterReload = await page.locator('.course-card').count();
+  const firstAfterReload = await page.locator('.course-card').first().innerText();
+  log('刷新后新课程仍在首页',
+    afterReload === newCourseCards && /Genesis 1:1-2 \(CEV\)/.test(firstAfterReload),
+    afterReload + ' 个课程，首卡 ' + firstAfterReload.split('\n')[0]);
+  log('刷新后仍高亮同一门课',
+    await page.locator('.course-card.active').count() === 1,
+    await page.evaluate(() => window.Course.activeId));
 
   // 新课程能出题
   await page.click('#btn-start');
@@ -266,6 +285,9 @@ Students should learn these difficult words. Read the passage and discuss the me
   log('新课程可出题', newQ > 0, newQ + ' 题');
 
   console.log('\n【6】词典查询与音标转换');
+  // 【5】刷新过页面，词典分片要重新按需加载；显式等 b/h 分片就绪再查，
+  // 否则 lookup 返回 null 会被误判成产品回归。
+  await page.evaluate(() => window.Lexicon.loadShards(['beginning', 'heavens', 'barren']));
   const lexTest = await page.evaluate(() => {
     const L = window.Lexicon;
     const a = L.lookup('beginning');
@@ -282,6 +304,38 @@ Students should learn these difficult words. Read the passage and discuss the me
   log('heavens 词条补全', !!lexTest.heavensMeaning, (lexTest.heavensMeaning || '').slice(0, 34));
   log('barren 释义存在', !!lexTest.barrenMeaning, (lexTest.barrenMeaning || '').slice(0, 34));
   log('音节切分', lexTest.syllables === 3, lexTest.syllables + ' 音节');
+
+  console.log('\n【6.5】导入课程包 JSON');
+  if (await page.locator('#view-quiz:not([hidden])').count()) {
+    await page.click('#btn-quit');
+    await page.click('#modal-confirm');
+    await page.waitForTimeout(300);
+  }
+  const beforeFileImport = await page.locator('.course-card').count();
+  await page.setInputFiles('#file-course-import', {
+    name: 'extra-course.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({
+      id: 'imported-extra', title: '测试导入课程', subtitle: 'E2E',
+      quote: 'Alpha and beta.', quoteEn: 'Alpha and beta.',
+      words: [
+        { id: 'w_alpha', word: 'alpha', phonetic: '/ˈælfə/', meaning: '阿尔法', level: 0, score: 10, distractors: [], cnDistractors: [], example: 'Alpha.' },
+        { id: 'w_beta', word: 'beta', phonetic: '/ˈbiːtə/', meaning: '贝塔', level: 1, score: 20, distractors: [], cnDistractors: [], example: 'Beta.' }
+      ],
+      sentences: []
+    }))
+  });
+  await page.waitForTimeout(500);
+  const afterFileImport = await page.locator('.course-card').count();
+  const fileImportFirst = await page.locator('.course-card').first().innerText();
+  log('导入课程包 JSON 后首页立刻新增',
+    afterFileImport === beforeFileImport + 1 && /测试导入课程/.test(fileImportFirst),
+    beforeFileImport + ' → ' + afterFileImport + '，首卡 ' + fileImportFirst.split('\n')[0]);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(900);
+  const afterFileReload = await page.locator('.course-card').count();
+  log('导入的课程包刷新后仍在', afterFileReload === afterFileImport,
+    afterFileReload + ' 个课程');
 
   console.log('\n【7】控制台检查');
   log('无页面异常', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));

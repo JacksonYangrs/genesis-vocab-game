@@ -4,7 +4,7 @@
  * 起因：v2 改造时漏了 #wordlist-note 元素，导致生词表页点开就报错。
  * 这类问题靠"测主要流程"发现不了，必须逐个视图点。
  */
-const { chromium } = require('/Users/yangjackson/AIProjects/Biblish/genesis-vocab-game/node_modules/playwright-core');
+const { chromium } = require('playwright-core');
 
 const BASE = process.env.GV_URL || 'http://127.0.0.1:8769/index.html';
 

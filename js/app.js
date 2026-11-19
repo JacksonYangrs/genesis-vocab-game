@@ -246,9 +246,9 @@
   /** 切换课程 */
   function selectCourse(id) {
     var self = this;
-    window.Course.loadCourse(id).then(function () {
-      window.Course.activeId = id;
-      renderHome();
+      window.Course.loadCourse(id).then(function () {
+        window.Course.setActive(id);
+        renderHome();
       toast('已切换到《' + window.Course.activeMeta().title + '》');
     }).catch(function (err) {
       toast('课程加载失败：' + err.message);
@@ -1072,11 +1072,35 @@
     els.btnTeacherPreview.addEventListener('click', function () {
       var data = Teacher.packageData;
       if (!data) return;
-      window.Course.saveLocal(data);
-      window.Course.activeId = data.id;
+      var r = window.Course.importCourse(data);
       showView('home');
       renderHome();
-      toast('已切换到新课程，去首页开始测试吧');
+      toast(r.persisted
+        ? '已切换到新课程，去首页开始测试吧'
+        : '已切换到新课程（本地存储不可用，刷新后会丢失）');
+    });
+
+    // 导入老师发来的课程包 JSON：进课程库 + 落盘 + 首页立刻显示
+    els.btnImportCourse.addEventListener('click', function () { els.fileCourseImport.click(); });
+    els.fileCourseImport.addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var data = window.Course.importJson(reader.result);
+          var r = window.Course.importCourse(data);
+          showView('home');
+          renderHome();
+          toast(r.persisted
+            ? '已导入《' + data.title + '》，首页已显示'
+            : '已导入《' + data.title + '》（本地存储不可用，刷新后会丢失）');
+        } catch (err) {
+          toast('课程包导入失败：' + (err.message || '文件格式错误'));
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
     });
   }
 
@@ -1511,6 +1535,8 @@
       modalCancel: $('modal-cancel'),
       courseList: $('course-list'),
       courseHint: $('course-hint'),
+      btnImportCourse: $('btn-import-course'),
+      fileCourseImport: $('file-course-import'),
       levelGrid: $('level-grid'),
       segCount: $('seg-count'),
       countDesc: $('count-desc'),

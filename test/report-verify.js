@@ -1,4 +1,4 @@
-const { chromium } = require('/Users/yangjackson/AIProjects/Biblish/genesis-vocab-game/node_modules/playwright-core');
+const { chromium } = require('playwright-core');
 (async () => {
   const b = await chromium.launch({ executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args:['--no-sandbox'] });
   const ctx = await b.newContext({ viewport:{width:390,height:844} });
