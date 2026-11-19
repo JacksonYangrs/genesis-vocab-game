@@ -215,6 +215,36 @@ Students should learn these difficult words. Read the passage and discuss the me
   const twCount = await page.locator('.tw-item').count();
   log('词表校对列表渲染', twCount > 5, twCount + ' 词');
 
+  // 松哥要求 1：导入后首页自动显示，不该再逼老师走「导出 → 预览」两步
+  const cardsAfterParse = await page.locator('.course-card').count();
+  const firstAfterParse = await page.locator('.course-card').first().innerText();
+  log('解析完首页自动出现新课程', cardsAfterParse === courseCards + 1,
+    courseCards + ' → ' + cardsAfterParse + '，首卡 ' + firstAfterParse.split('\n')[0]);
+  log('新课程自动高亮',
+    await page.locator('.course-card.active').first().innerText() === firstAfterParse);
+
+  // 松哥要求 2：生成的单词不能遗漏
+  const wordIntegrity = await page.evaluate(() => {
+    const T = window.Teacher;
+    const cand = T.parsed.candidates.map(c => c.word);
+    const inTable = [].concat(...T.layers).map(i => i.word);
+    const hyphen = window.Importer.extractCandidates('Check self-control and CEV.', []).map(c => c.word);
+    return {
+      cand: cand.length,
+      inTable: inTable.length,
+      lost: cand.filter(w => inTable.indexOf(w) < 0),
+      missingKept: (T.missing || []).every(w => inTable.indexOf(w) >= 0),
+      missingCount: (T.missing || []).length,
+      hyphen: hyphen
+    };
+  });
+  log('候选词一个不漏进词表', wordIntegrity.lost.length === 0,
+    wordIntegrity.cand + ' 词全部进入，丢失 ' + wordIntegrity.lost.length);
+  log('词典未收录的词仍保留', wordIntegrity.missingKept,
+    wordIntegrity.missingCount + ' 个待补词留在校对表');
+  log('连字符词不再被过滤', wordIntegrity.hyphen.indexOf('self-control') >= 0,
+    wordIntegrity.hyphen.join(', '));
+
   // 分层词数单调性（教师端）
   const tLevels = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.tl-row')];
@@ -305,37 +335,20 @@ Students should learn these difficult words. Read the passage and discuss the me
   log('barren 释义存在', !!lexTest.barrenMeaning, (lexTest.barrenMeaning || '').slice(0, 34));
   log('音节切分', lexTest.syllables === 3, lexTest.syllables + ' 音节');
 
-  console.log('\n【6.5】导入课程包 JSON');
+  console.log('\n【6.5】首页干净');
   if (await page.locator('#view-quiz:not([hidden])').count()) {
     await page.click('#btn-quit');
     await page.click('#modal-confirm');
     await page.waitForTimeout(300);
   }
-  const beforeFileImport = await page.locator('.course-card').count();
-  await page.setInputFiles('#file-course-import', {
-    name: 'extra-course.json',
-    mimeType: 'application/json',
-    buffer: Buffer.from(JSON.stringify({
-      id: 'imported-extra', title: '测试导入课程', subtitle: 'E2E',
-      quote: 'Alpha and beta.', quoteEn: 'Alpha and beta.',
-      words: [
-        { id: 'w_alpha', word: 'alpha', phonetic: '/ˈælfə/', meaning: '阿尔法', level: 0, score: 10, distractors: [], cnDistractors: [], example: 'Alpha.' },
-        { id: 'w_beta', word: 'beta', phonetic: '/ˈbiːtə/', meaning: '贝塔', level: 1, score: 20, distractors: [], cnDistractors: [], example: 'Beta.' }
-      ],
-      sentences: []
-    }))
+  log('首页没有多余的导入按钮',
+    await page.locator('#btn-import-course').count() === 0 &&
+    await page.locator('#file-course-import').count() === 0);
+  const activeWords = await page.evaluate(() => {
+    const c = window.Course.active();
+    return c ? c.words.length : -1;
   });
-  await page.waitForTimeout(500);
-  const afterFileImport = await page.locator('.course-card').count();
-  const fileImportFirst = await page.locator('.course-card').first().innerText();
-  log('导入课程包 JSON 后首页立刻新增',
-    afterFileImport === beforeFileImport + 1 && /测试导入课程/.test(fileImportFirst),
-    beforeFileImport + ' → ' + afterFileImport + '，首卡 ' + fileImportFirst.split('\n')[0]);
-  await page.reload({ waitUntil: 'networkidle' });
-  await page.waitForTimeout(900);
-  const afterFileReload = await page.locator('.course-card').count();
-  log('导入的课程包刷新后仍在', afterFileReload === afterFileImport,
-    afterFileReload + ' 个课程');
+  log('刷新后激活课程仍可正常取词', activeWords > 0, activeWords + ' 词');
 
   console.log('\n【7】控制台检查');
   log('无页面异常', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));

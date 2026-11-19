@@ -1102,7 +1102,6 @@ h1, h2, h3, p { margin: 0; }
 /* ---------- 课程列表 ---------- */
 
 .course-list { display: flex; flex-direction: column; gap: 8px; }
-.course-import-row { margin-top: 10px; }
 
 .course-card {
   display: flex;

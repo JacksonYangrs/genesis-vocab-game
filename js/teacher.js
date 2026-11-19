@@ -25,6 +25,8 @@
       this.sentences = null;
       this.packageData = null;
       this._selected = {};
+      this.sourceTitle = '';
+      this.missing = [];
     },
 
     /**
@@ -59,6 +61,7 @@
           text: result.text,
           sentences: result.sentences,
           candidates: candidates,
+          skipped: candidates.skipped || [],
           pageCount: result.pageCount
         };
 
@@ -90,16 +93,26 @@
       var self = this;
       var cands = this.parsed.candidates;
 
-      // 查词典：只保留词典里有的词
+      // 查词典。词典查不到也照收 —— 「生成的单词不能遗漏」优先于
+      // 「每条都有现成释义」，释义留空并标注待补，由老师在校对页决定去留。
       var looked = [];
       var missing = [];
       cands.forEach(function (c) {
         var info = global.Lexicon.lookup(c.word);
-        if (info) {
-          looked.push({ word: c.word, info: info, sentences: c.sentences });
-        } else {
+        if (!info) {
           missing.push(c.word);
+          info = {
+            word: c.word,
+            phonetic: '',
+            rawPhonetic: '',
+            meaning: '（词典未收录，待补释义）',
+            fullMeaning: '',
+            pos: '',
+            freq: 0,
+            forms: []
+          };
         }
+        looked.push({ word: c.word, info: info, sentences: c.sentences });
       });
 
       if (!looked.length) {

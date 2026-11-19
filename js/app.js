@@ -917,6 +917,29 @@
 
   /* ============ 教师模式 ============ */
 
+  /** 课程标题：粘贴文本取首行，PDF 取文件名 */
+  function teacherMeta() {
+    var firstLine = (els.teacherText.value || '').split('\n')[0].trim();
+    var title = (firstLine || Teacher.sourceTitle || '新课程').slice(0, 40);
+    return {
+      title: title,
+      subtitle: '教师导入 · ' + new Date().toLocaleDateString('zh-CN')
+    };
+  }
+
+  /**
+   * 把当前词表立刻写进课程库并持久化。
+   * 松哥要求「导入新课程后首页自动显示」：解析完就得生效，
+   * 不该再逼老师走「导出课程包 → 在学生端预览」两步。
+   * 校对页每次改动都会重跑（同 id 覆盖，不会堆出多门课）。
+   */
+  function applyTeacherCourse() {
+    if (!Teacher.layers) return null;
+    var r = window.Course.importCourse(Teacher.buildPackage(teacherMeta()));
+    renderHome();
+    return r;
+  }
+
   function renderTeacher() {
     els.teacherStep1.hidden = Teacher.step !== 1;
     els.teacherStep2.hidden = Teacher.step !== 2;
@@ -932,10 +955,17 @@
     var total = byLevel[0].length + byLevel[1].length + byLevel[2].length;
     var th = window.Lexicon.lastThresholds || {};
 
+    var cand = Teacher.parsed ? Teacher.parsed.candidates.length : total;
+    var missingN = (Teacher.missing || []).length;
+    var skipped = (Teacher.parsed && Teacher.parsed.skipped) || [];
+
     els.teacherSummary.textContent =
-      '共 ' + total + ' 个生词（入门 ' + byLevel[0].length +
+      '材料提取 ' + cand + ' 个词，全部进入校对表（入门 ' + byLevel[0].length +
       ' / 进阶 ' + byLevel[1].length + ' / 挑战 ' + byLevel[2].length +
       '）· 难度门槛 ' + (th.t1 || '-') + ' / ' + (th.t2 || '-') +
+      (missingN ? ' · ' + missingN + ' 个词典未收录，已保留待补' : '') +
+      (skipped.length ? ' · 已排除功能词 ' + skipped.length + ' 个：' +
+        skipped.slice(0, 6).join(', ') + (skipped.length > 6 ? '…' : '') : '') +
       '。点词名可切换分层，点「×」移除该词。';
 
     var names = ['入门', '进阶', '挑战'];
@@ -1037,6 +1067,8 @@
         Teacher.setLevel(w, parseInt(btn.getAttribute('data-lv'), 10));
       }
       renderTeacherWords();
+      // 校对结果立刻回写课程包，保证首页那门课与老师看到的一致
+      applyTeacherCourse();
     });
 
     els.btnTeacherBack.addEventListener('click', function () {
@@ -1044,13 +1076,9 @@
       renderTeacher();
     });
 
-    // 导出
+    // 导出（课程其实在解析完就已进首页，这里只是生成可下载的 JSON）
     els.btnTeacherExport.addEventListener('click', function () {
-      var meta = {
-        title: els.teacherText.value ? els.teacherText.value.split('\n')[0].slice(0, 40) : '新课程',
-        subtitle: '教师导入 · ' + new Date().toLocaleDateString('zh-CN')
-      };
-      var data = Teacher.buildPackage(meta);
+      applyTeacherCourse();
       Teacher.step = 3;
       renderTeacher();
       toast('课程包已生成');
@@ -1070,42 +1098,16 @@
     });
 
     els.btnTeacherPreview.addEventListener('click', function () {
-      var data = Teacher.packageData;
-      if (!data) return;
-      var r = window.Course.importCourse(data);
+      applyTeacherCourse();
       showView('home');
       renderHome();
-      toast(r.persisted
-        ? '已切换到新课程，去首页开始测试吧'
-        : '已切换到新课程（本地存储不可用，刷新后会丢失）');
-    });
-
-    // 导入老师发来的课程包 JSON：进课程库 + 落盘 + 首页立刻显示
-    els.btnImportCourse.addEventListener('click', function () { els.fileCourseImport.click(); });
-    els.fileCourseImport.addEventListener('change', function (e) {
-      var file = e.target.files && e.target.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        try {
-          var data = window.Course.importJson(reader.result);
-          var r = window.Course.importCourse(data);
-          showView('home');
-          renderHome();
-          toast(r.persisted
-            ? '已导入《' + data.title + '》，首页已显示'
-            : '已导入《' + data.title + '》（本地存储不可用，刷新后会丢失）');
-        } catch (err) {
-          toast('课程包导入失败：' + (err.message || '文件格式错误'));
-        }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
+      toast('已回到首页，新课程已在课程列表');
     });
   }
 
   /** 执行解析 */
   function handleParse(file, text) {
+    Teacher.sourceTitle = file ? String(file.name || '').replace(/\.pdf$/i, '') : '';
     els.teacherStatus.textContent = '正在解析…';
     els.teacherStatus.className = 'teacher-status busy';
     els.btnParse.disabled = true;
@@ -1118,7 +1120,10 @@
       els.btnParse.disabled = false;
       Teacher.step = 2;
       renderTeacher();
-      toast('已提取生词，请校对');
+      var applied = applyTeacherCourse();
+      toast(applied && !applied.persisted
+        ? '课程已加入首页（本地存储不可用，刷新后会丢失）'
+        : '课程已加入首页，可直接开始测试');
     }).catch(function (err) {
       els.teacherStatus.textContent = '❌ ' + err.message;
       els.teacherStatus.className = 'teacher-status error';
@@ -1535,8 +1540,6 @@
       modalCancel: $('modal-cancel'),
       courseList: $('course-list'),
       courseHint: $('course-hint'),
-      btnImportCourse: $('btn-import-course'),
-      fileCourseImport: $('file-course-import'),
       levelGrid: $('level-grid'),
       segCount: $('seg-count'),
       countDesc: $('count-desc'),

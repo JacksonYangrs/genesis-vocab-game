@@ -67,10 +67,23 @@
                   return page.getTextContent().then(function (tc) {
                     var line = '';
                     var lines = [];
+                    var lastRight = null;
                     for (var k = 0; k < tc.items.length; k++) {
                       var it = tc.items[k];
+                      var x = it.transform ? it.transform[4] : 0;
+                      var fontH = it.transform ? Math.abs(it.transform[3]) : 0;
+                      // pdf.js 会把一行拆成多个 item，直接拼接会把
+                      // "the" + "earth" 粘成 "theearth"，抽词时整词丢失。
+                      // 只在片段间存在明显横向空隙时补一个空格。
+                      var gap = (fontH > 0 ? fontH : 10) * 0.3;
+                      if (lastRight != null && line && !/^\s/.test(it.str) &&
+                          !/\s$/.test(line) && (x - lastRight) > gap) {
+                        line += ' ';
+                      }
                       line += it.str;
-                      if (it.hasEOL) { lines.push(line); line = ''; }
+                      var scale = it.transform ? Math.abs(it.transform[0]) : 1;
+                      lastRight = x + (it.width || 0) * scale;
+                      if (it.hasEOL) { lines.push(line); line = ''; lastRight = null; }
                     }
                     if (line) lines.push(line);
                     pageTexts.push(lines.join('\n'));
@@ -133,11 +146,13 @@
       this.STOPWORDS.forEach(function (w) { stop[w] = true; });
 
       var freq = {};
+      var skipped = [];
       tokens.forEach(function (t) {
         var w = t.toLowerCase().replace(/^-+|-+$/g, '');
-        if (w.length < 3 || w.length > 18) return;
-        if (!/^[a-z]+(?:'[a-z]+)?$/.test(w)) return;
-        if (stop[w]) return;
+        if (w.length < 2 || w.length > 24) { skipped.push(w); return; }
+        // 允许撇号与连字符构词（self-control / God's），否则整词连候选都进不了
+        if (!/^[a-z]+(?:['-][a-z]+)*$/.test(w)) { skipped.push(w); return; }
+        if (stop[w]) { skipped.push(w); return; }
         freq[w] = (freq[w] || 0) + 1;
       });
 
@@ -167,6 +182,8 @@
         if (b.count !== a.count) return b.count - a.count;
         return a.word.localeCompare(b.word);
       });
+      // 被排除的词一并带出去，校对页要看得见，杜绝「静默漏词」
+      cands.skipped = skipped;
       return cands;
     },
 
