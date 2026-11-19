@@ -1,0 +1,322 @@
+{
+  "id": "genesis-1-3-5",
+  "title": "创世记 1:3–5 · 光与暗",
+  "subtitle": "Genesis 1:3-5 · 含五卷书名",
+  "reference": "Genesis 1:3-5",
+  "quote": "神說：「要有光」，就有了光。神看光是好的，就把光暗分開了。神稱光為晝，稱暗為夜。有晚上，有早晨，這是第一日。",
+  "quoteEn": "And God said, \"Let there be light,\" and there was light. And God saw that the light was good. And God separated the light from the darkness. God called the light Day, and the darkness he called Night. And there was evening and there was morning, the first day.",
+  "createdAt": 1795074544422,
+  "thresholds": {
+    "t1": 30,
+    "t2": 54
+  },
+  "words": [
+    {
+      "id": "w_god",
+      "word": "god",
+      "phonetic": "/ɡɒd/",
+      "meaning": "上帝",
+      "fullMeaning": "上帝",
+      "pos": "",
+      "level": 0,
+      "score": 0,
+      "distractors": [
+        "day",
+        "light",
+        "night"
+      ],
+      "cnDistractors": [
+        "日, 白天",
+        "光, 光亮",
+        "夜, 夜晚"
+      ],
+      "example": "And God said, \"Let there be light,\" and there was light.",
+      "syllables": null
+    },
+    {
+      "id": "w_day",
+      "word": "day",
+      "phonetic": "/deɪ/",
+      "meaning": "日, 白天",
+      "fullMeaning": "日, 白天",
+      "pos": "",
+      "level": 0,
+      "score": 6,
+      "distractors": [
+        "god",
+        "light",
+        "night"
+      ],
+      "cnDistractors": [
+        "上帝",
+        "光, 光亮",
+        "夜, 夜晚"
+      ],
+      "example": "God called the light Day, and the darkness he called Night.",
+      "syllables": null
+    },
+    {
+      "id": "w_light",
+      "word": "light",
+      "phonetic": "/laɪt/",
+      "meaning": "光, 光亮",
+      "fullMeaning": "光, 光亮",
+      "pos": "",
+      "level": 0,
+      "score": 12,
+      "distractors": [
+        "god",
+        "day",
+        "night"
+      ],
+      "cnDistractors": [
+        "上帝",
+        "日, 白天",
+        "夜, 夜晚"
+      ],
+      "example": "And God said, \"Let there be light,\" and there was light.",
+      "syllables": null
+    },
+    {
+      "id": "w_night",
+      "word": "night",
+      "phonetic": "/naɪt/",
+      "meaning": "夜, 夜晚",
+      "fullMeaning": "夜, 夜晚",
+      "pos": "",
+      "level": 0,
+      "score": 18,
+      "distractors": [
+        "god",
+        "day",
+        "light"
+      ],
+      "cnDistractors": [
+        "上帝",
+        "日, 白天",
+        "光, 光亮"
+      ],
+      "example": "God called the light Day, and the darkness he called Night.",
+      "syllables": null
+    },
+    {
+      "id": "w_morning",
+      "word": "morning",
+      "phonetic": "/ˈmɔːnɪŋ/",
+      "meaning": "早晨, 清晨",
+      "fullMeaning": "早晨, 清晨",
+      "pos": "",
+      "level": 0,
+      "score": 24,
+      "distractors": [
+        "god",
+        "day",
+        "light"
+      ],
+      "cnDistractors": [
+        "上帝",
+        "日, 白天",
+        "光, 光亮"
+      ],
+      "example": "And there was evening and there was morning, the first day.",
+      "syllables": null
+    },
+    {
+      "id": "w_evening",
+      "word": "evening",
+      "phonetic": "/ˈiːvnɪŋ/",
+      "meaning": "傍晚, 夜晚",
+      "fullMeaning": "傍晚, 夜晚",
+      "pos": "",
+      "level": 0,
+      "score": 30,
+      "distractors": [
+        "god",
+        "day",
+        "light"
+      ],
+      "cnDistractors": [
+        "上帝",
+        "日, 白天",
+        "光, 光亮"
+      ],
+      "example": "And there was evening and there was morning, the first day.",
+      "syllables": null
+    },
+    {
+      "id": "w_darkness",
+      "word": "darkness",
+      "phonetic": "/ˈdɑːknəs/",
+      "meaning": "黑暗",
+      "fullMeaning": "黑暗",
+      "pos": "",
+      "level": 1,
+      "score": 36,
+      "distractors": [
+        "separated",
+        "exodus",
+        "numbers"
+      ],
+      "cnDistractors": [
+        "分开的, 分离的",
+        "出埃及记",
+        "民数记"
+      ],
+      "example": "And God separated the light from the darkness.",
+      "syllables": null
+    },
+    {
+      "id": "w_separated",
+      "word": "separated",
+      "phonetic": "/ˈsepəreɪtɪd/",
+      "meaning": "分开的, 分离的",
+      "fullMeaning": "分开的, 分离的",
+      "pos": "",
+      "level": 1,
+      "score": 42,
+      "distractors": [
+        "darkness",
+        "exodus",
+        "numbers"
+      ],
+      "cnDistractors": [
+        "黑暗",
+        "出埃及记",
+        "民数记"
+      ],
+      "example": "And God separated the light from the darkness.",
+      "syllables": null
+    },
+    {
+      "id": "w_genesis",
+      "word": "genesis",
+      "phonetic": "/ˈdʒɛnəsɪs/",
+      "meaning": "创世记",
+      "fullMeaning": "创世记",
+      "pos": "",
+      "level": 2,
+      "score": 66,
+      "distractors": [
+        "leviticus",
+        "deuteronomy"
+      ],
+      "cnDistractors": [
+        "利未记",
+        "申命记"
+      ],
+      "example": "",
+      "syllables": null
+    },
+    {
+      "id": "w_exodus",
+      "word": "exodus",
+      "phonetic": "/ˈɛksədəs/",
+      "meaning": "出埃及记",
+      "fullMeaning": "出埃及记",
+      "pos": "",
+      "level": 1,
+      "score": 48,
+      "distractors": [
+        "darkness",
+        "separated",
+        "numbers"
+      ],
+      "cnDistractors": [
+        "黑暗",
+        "分开的, 分离的",
+        "民数记"
+      ],
+      "example": "",
+      "syllables": null
+    },
+    {
+      "id": "w_leviticus",
+      "word": "leviticus",
+      "phonetic": "/ləˈvɪtɪkəs/",
+      "meaning": "利未记",
+      "fullMeaning": "利未记",
+      "pos": "",
+      "level": 2,
+      "score": 72,
+      "distractors": [
+        "genesis",
+        "deuteronomy"
+      ],
+      "cnDistractors": [
+        "创世记",
+        "申命记"
+      ],
+      "example": "",
+      "syllables": null
+    },
+    {
+      "id": "w_numbers",
+      "word": "numbers",
+      "phonetic": "/ˈnʌmbərz/",
+      "meaning": "民数记",
+      "fullMeaning": "民数记",
+      "pos": "",
+      "level": 1,
+      "score": 54,
+      "distractors": [
+        "darkness",
+        "separated",
+        "exodus"
+      ],
+      "cnDistractors": [
+        "黑暗",
+        "分开的, 分离的",
+        "出埃及记"
+      ],
+      "example": "",
+      "syllables": null
+    },
+    {
+      "id": "w_deuteronomy",
+      "word": "deuteronomy",
+      "phonetic": "/ˌduːtəˈrɑːnəmi/",
+      "meaning": "申命记",
+      "fullMeaning": "申命记",
+      "pos": "",
+      "level": 2,
+      "score": 80,
+      "distractors": [
+        "genesis",
+        "leviticus"
+      ],
+      "cnDistractors": [
+        "创世记",
+        "利未记"
+      ],
+      "example": "",
+      "syllables": null
+    }
+  ],
+  "sentences": [
+    {
+      "text": "And God said, \"Let there be light,\" and there was light.",
+      "target": "god",
+      "level": 0
+    },
+    {
+      "text": "And God saw that the light was good.",
+      "target": "god",
+      "level": 0
+    },
+    {
+      "text": "And God separated the light from the darkness.",
+      "target": "darkness",
+      "level": 1
+    },
+    {
+      "text": "God called the light Day, and the darkness he called Night.",
+      "target": "darkness",
+      "level": 1
+    },
+    {
+      "text": "And there was evening and there was morning, the first day.",
+      "target": "day",
+      "level": 0
+    }
+  ]
+}
